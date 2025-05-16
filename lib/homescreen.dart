@@ -169,10 +169,10 @@ class LeaveRequestsPage extends StatelessWidget {
                                 ),
                                 child: Text('REJECT'),
                               ),
-                              TextButton(
-                                onPressed: () {},
-                                child: Text('EDIT'),
-                              )
+                              // TextButton(
+                              //   onPressed: () {},
+                              //   child: Text('EDIT'),
+                              // )
                             ],
                           )
                         ],
@@ -185,28 +185,18 @@ class LeaveRequestsPage extends StatelessWidget {
           )
         ],
       ),
+      // Bottom Navigation
       bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed, // Important to allow backgroundColor
+        selectedItemColor: Colors.white,
+        unselectedItemColor: Colors.grey,
+        backgroundColor: Colors.black, // This sets the background- color
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.grid_view),
-            label: 'SERVICES',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'HOME',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.check_circle_outline),
-            label: 'APPROVALS',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.menu),
-            label: 'MORE',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
+          BottomNavigationBarItem(icon: Icon(Icons.insert_chart), label: 'Projects'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Setting'),
         ],
-        selectedItemColor: Colors.orange,
-        unselectedItemColor: Colors.black,
-        type: BottomNavigationBarType.fixed,
       ),
     );
   }

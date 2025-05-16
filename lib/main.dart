@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:hrms_project/login.dart';
 import 'package:hrms_project/servicr.dart';
+import 'package:hrms_project/splashscreen.dart';
 
 import 'homescreen.dart'; // Make sure this file exists
 
@@ -12,7 +14,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home:   LeaveRequestsPage (), // Replace with actual widget class in servicr.dart
+      home:  SplashScreen()
     );
   }
 }
