@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:hrms_project/servicr.dart';
+import 'package:hrms_project/Admin_Sections/admin_dashboard.dart';
 
 
 class LoginScreen extends StatefulWidget {

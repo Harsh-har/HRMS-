@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:hrms_project/Admin_Sections/admin_notification.dart';
 
-import 'homescreen.dart';
+import 'admin_profile.dart';
+import 'admin_setting.dart';
+import 'emp_managment.dart';
+import 'admin_leaverequest.dart';
 
 void main() => runApp(EmployeeApp());
 
@@ -20,7 +24,7 @@ class DashboardScreen extends StatelessWidget {
     {"icon": Icons.event_note, "label": "Attendance Monitoring"},
     {"icon": Icons.insert_chart, "label": "Leave Management"},
     {"icon": Icons.access_time, "label": "TimeSheets"},
-    {"icon": Icons.calendar_today, "label": "Holiday Calender"},
+    {"icon": Icons.calendar_today, "label": "Holiday Calendar"},
     {"icon": Icons.folder, "label": "Performance Review"},
   ];
 
@@ -34,49 +38,36 @@ class DashboardScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Profile Row
+              // Profile Row (without search icon)
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Row(
                     children: [
                       CircleAvatar(
-                        radius: 24,
-                        backgroundImage: AssetImage("assets/profile/profileuser.png"),
-                        child: Icon(Icons.person), // fallback icon
-                        onBackgroundImageError: (error, stackTrace) {
-                          print("Image load failed: $error");
-                        },
+                        radius: 30,
+                        backgroundImage: NetworkImage('https://randomuser.me/api/portraits/men/1.jpg'),
                       ),
-                      SizedBox(width: 12),
+                      SizedBox(height: 16),
+                      SizedBox(width: 25),
                       Text("Pradeep Tamar",
                           style: TextStyle(
                               fontSize: 22, fontWeight: FontWeight.bold)),
                     ],
                   ),
-                  Row(
-                    children: [
-                      Icon(Icons.search),
-                      SizedBox(width: 16),
-                      Icon(Icons.notifications),
-                    ],
-                  )
+                  IconButton(
+                    icon: Icon(Icons.notifications),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) =>AdminNotification()),
+                      );
+                    },
+                  ),
+
                 ],
               ),
-              SizedBox(height: 20),
-
-              // Search Bar
-              TextField(
-                decoration: InputDecoration(
-                  hintText: 'Search',
-                  prefixIcon: Icon(Icons.search),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(30)),
-                  filled: true,
-                  fillColor: Colors.white,
-                ),
-              ),
-              SizedBox(height: 20),
+              SizedBox(height: 70),
 
               // Grid
               Expanded(
@@ -94,21 +85,29 @@ class DashboardScreen extends StatelessWidget {
                                 builder: (context) => LeaveRequestsPage()),
                           );
                         }
+    else if (item["label"] == "Employee Management") {
+    Navigator.push(
+    context,
+    MaterialPageRoute(
+    builder: (context) => EmployeeForm()),
+    );}
                       },
                       child: Container(
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(item["icon"],
-                                size: 50, color: Colors.blueAccent),
-                            SizedBox(height: 10),
-                            Text(item["label"],
-                                style: TextStyle(fontSize: 16)),
-                          ],
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(item["icon"],
+                                  size: 50, color: Colors.blueAccent),
+                              SizedBox(height: 10),
+                              Text(item["label"],
+                                  style: TextStyle(fontSize: 16)),
+                            ],
+                          ),
                         ),
                       ),
                     );
@@ -119,26 +118,35 @@ class DashboardScreen extends StatelessWidget {
           ),
         ),
       ),
-
-      // Bottom Navigation
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         selectedItemColor: Colors.white,
         unselectedItemColor: Colors.grey,
         backgroundColor: Colors.black,
+        onTap: (index) {
+          if (index == 2) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) =>  AdminProfile ()),
+            );
+          } else if (index == 3) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => AdminSetting()),
+            );
+          }
+        },
         items: const [
           BottomNavigationBarItem(
               icon: Icon(Icons.dashboard), label: 'Dashboard'),
           BottomNavigationBarItem(
               icon: Icon(Icons.insert_chart), label: 'Projects'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.person), label: 'Profile'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
           BottomNavigationBarItem(
               icon: Icon(Icons.settings), label: 'Setting'),
         ],
       ),
+
     );
   }
 }
-
-
