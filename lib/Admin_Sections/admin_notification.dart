@@ -100,7 +100,6 @@ class _HRMNotificationScreenState extends State<AdminNotification> {
         children: [
           _buildCategoryTab('All', true),
           _buildCategoryTab('Leave', false),
-          _buildCategoryTab('Payroll', false),
           _buildCategoryTab('Tasks', false),
           _buildCategoryTab('Announcements', false),
           _buildCategoryTab('Birthdays', false),

@@ -77,7 +77,9 @@ class _EmployeeFormState extends State<EmployeeForm> {
               buildTextField('Employee Name', Icons.person, (value) => _name = value ?? ''),
               buildTextField('Employee Email', Icons.email, (value) => _email = value ?? ''),
               buildTextField('Phone No', Icons.phone, (value) => _phone = value ?? ''),
-              buildDropdown('Department', ['HR', 'Engineering', 'Sales', 'Marketing'], (newValue) => _department = newValue ?? ''),
+              buildTextField('Employee ID', Icons.person, (value) => _name = value ?? ''),
+              buildTextField('Joining Date', Icons.calendar_today, (value) => _phone = value ?? ''),
+              buildDropdown('Department', ['HR', 'Engineering', 'Sales', 'Marketing','Admin'], (newValue) => _department = newValue ?? ''),
               buildDropdown('Job Title', ['Manager', 'Developer', 'Designer', 'Analyst'], (newValue) => _jobTitle = newValue ?? ''),
               buildPasswordField('Password', Icons.lock, (value) => _password = value ?? '',
                   obscureText: _obscurePassword, toggleVisibility: () {

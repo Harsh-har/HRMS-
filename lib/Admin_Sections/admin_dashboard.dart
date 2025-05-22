@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:hrms_project/Admin_Sections/admin_notification.dart';
 
+import 'admin _Attandencemonitor.dart';
+import 'admin_holidaycalender.dart';
+import 'admin_performance.dart';
 import 'admin_profile.dart';
+import 'admin_projectswatch.dart';
 import 'admin_setting.dart';
+import 'admin_timesheetwtch.dart';
 import 'emp_managment.dart';
 import 'admin_leaverequest.dart';
 
@@ -46,7 +51,7 @@ class DashboardScreen extends StatelessWidget {
                     children: [
                       CircleAvatar(
                         radius: 30,
-                        backgroundImage: NetworkImage('https://randomuser.me/api/portraits/men/1.jpg'),
+                        backgroundImage: AssetImage('assets/profile/adminimage.jpg'),
                       ),
                       SizedBox(height: 16),
                       SizedBox(width: 25),
@@ -85,12 +90,36 @@ class DashboardScreen extends StatelessWidget {
                                 builder: (context) => LeaveRequestsPage()),
                           );
                         }
-    else if (item["label"] == "Employee Management") {
-    Navigator.push(
-    context,
-    MaterialPageRoute(
-    builder: (context) => EmployeeForm()),
-    );}
+                         else if (item["label"] == "Employee Management") {
+                         Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                          builder: (context) => EmployeeForm()),
+                          );}
+                        else if (item["label"] == "TimeSheets") {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => TimesheetPage()),
+                          );}
+                        else if (item["label"] == "Holiday Calendar") {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => HolidayCalendarAdminScreen()),
+                          );}
+                        else if (item["label"] == "Performance Review") {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => AddPerformanceReviewScreen(employeeName: 'Ansh',)),
+                          );}
+                        else if (item["label"] == "Attendance Monitoring") {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) =>AttendanceMonitoringScreen()),
+                          );}
                       },
                       child: Container(
                         decoration: BoxDecoration(
@@ -124,7 +153,13 @@ class DashboardScreen extends StatelessWidget {
         unselectedItemColor: Colors.grey,
         backgroundColor: Colors.black,
         onTap: (index) {
-          if (index == 2) {
+          if (index == 1) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) =>  ProjectScreen ()),
+            );
+          }
+          else if (index == 2) {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) =>  AdminProfile ()),

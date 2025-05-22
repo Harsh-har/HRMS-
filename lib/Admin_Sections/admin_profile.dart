@@ -30,7 +30,7 @@ class AdminProfile extends StatelessWidget {
               children: [
                 _buildInfoRow(Icons.person, 'Employee ID', 'EMP-1006'),
                 _buildInfoRow(Icons.work, 'Job Title', 'CEO'),
-                _buildInfoRow(Icons.group, 'Department', 'Engineering'),
+                _buildInfoRow(Icons.group, 'Department', 'Admin'),
                 _buildInfoRow(Icons.calendar_today, 'Join Date', '15 Oct 2024'),
               ],
             ),
@@ -56,7 +56,7 @@ class AdminProfile extends StatelessWidget {
       children: [
         CircleAvatar(
           radius: 50,
-          backgroundImage: NetworkImage('https://randomuser.me/api/portraits/men/1.jpg'),
+          backgroundImage: AssetImage('assets/profile/adminimage.jpg'),
         ),
         SizedBox(height: 16),
         Text(

@@ -1,5 +1,18 @@
 import 'package:flutter/material.dart';
 
+import 'admin_profile.dart';
+
+// Dummy Profile Edit Screen
+class Profile_Screen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Edit Profile')),
+      body: Center(child: Text('Profile Edit Screen')),
+    );
+  }
+}
+
 class AdminSetting extends StatefulWidget {
   @override
   _HRMSettingsScreenState createState() => _HRMSettingsScreenState();
@@ -20,7 +33,6 @@ class _HRMSettingsScreenState extends State<AdminSetting> {
           IconButton(
             icon: Icon(Icons.save),
             onPressed: () {
-              // Save settings functionality
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('Settings saved successfully')),
               );
@@ -31,7 +43,6 @@ class _HRMSettingsScreenState extends State<AdminSetting> {
       body: ListView(
         padding: EdgeInsets.all(16),
         children: [
-          // Account Settings Section
           _buildSectionHeader('Account Settings', Icons.account_circle),
           _buildSettingsCard([
             _buildSettingsItem(
@@ -46,7 +57,6 @@ class _HRMSettingsScreenState extends State<AdminSetting> {
             ),
           ]),
 
-          // Help & Support
           _buildSectionHeader('Help & Support', Icons.help),
           _buildSettingsCard([
             _buildSettingsItem(
@@ -61,7 +71,6 @@ class _HRMSettingsScreenState extends State<AdminSetting> {
             ),
           ]),
 
-          // Legal
           _buildSectionHeader('Legal', Icons.gavel),
           _buildSettingsCard([
             _buildSettingsItem(
@@ -76,7 +85,6 @@ class _HRMSettingsScreenState extends State<AdminSetting> {
             ),
           ]),
 
-          // App Info
           _buildSectionHeader('About', Icons.info),
           _buildSettingsCard([
             _buildSettingsItem(
@@ -136,23 +144,6 @@ class _HRMSettingsScreenState extends State<AdminSetting> {
     );
   }
 
-  Widget _buildToggleItem({
-    required IconData icon,
-    required String title,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-  }) {
-    return ListTile(
-      leading: Icon(icon, size: 22),
-      title: Text(title),
-      trailing: Switch(
-        value: value,
-        onChanged: onChanged,
-        activeColor: Colors.blue,
-      ),
-    );
-  }
-
   Widget _buildLogoutButton() {
     return ElevatedButton.icon(
       icon: Icon(Icons.logout),
@@ -160,15 +151,17 @@ class _HRMSettingsScreenState extends State<AdminSetting> {
       style: ElevatedButton.styleFrom(
         backgroundColor: Color(0xFFCFD8DC),
         padding: EdgeInsets.symmetric(vertical: 16),
-
       ),
       onPressed: () => _confirmLogout(context),
     );
   }
 
-  // Placeholder functions for actions
+  // Function to navigate to the Profile Edit Screen
   void _navigateToProfileEdit(BuildContext context) {
-    // Navigation logic
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => AdminProfile()),
+    );
   }
 
   void _showChangePasswordDialog(BuildContext context) {
@@ -190,18 +183,6 @@ class _HRMSettingsScreenState extends State<AdminSetting> {
         ],
       ),
     );
-  }
-
-  void _navigateToNotificationSettings(BuildContext context) {
-    // Navigation logic
-  }
-
-  void _showLanguageDialog(BuildContext context) {
-    // Language selection logic
-  }
-
-  void _contactHR(BuildContext context) {
-    // Contact HR logic
   }
 
   void _openFAQs(BuildContext context) {
@@ -231,7 +212,7 @@ class _HRMSettingsScreenState extends State<AdminSetting> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              // Perform logout
+              // Perform logout logic
             },
             child: Text('Logout'),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
