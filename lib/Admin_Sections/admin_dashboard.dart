@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hrms_project/Admin_Sections/admin_notification.dart';
 
+import 'EmployeeListPage.dart';
 import 'admin _Attandencemonitor.dart';
 import 'admin_holidaycalender.dart';
 import 'admin_performance.dart';
@@ -51,7 +52,8 @@ class DashboardScreen extends StatelessWidget {
                     children: [
                       CircleAvatar(
                         radius: 30,
-                        backgroundImage: AssetImage('assets/profile/adminimage.jpg'),
+                        backgroundImage: AssetImage('assets/profile'
+                            '/adminimage.jpg'),
                       ),
                       SizedBox(height: 16),
                       SizedBox(width: 25),
@@ -94,7 +96,7 @@ class DashboardScreen extends StatelessWidget {
                          Navigator.push(
                           context,
                           MaterialPageRoute(
-                          builder: (context) => EmployeeForm()),
+                          builder: (context) => EmployeeListPage()),
                           );}
                         else if (item["label"] == "TimeSheets") {
                           Navigator.push(

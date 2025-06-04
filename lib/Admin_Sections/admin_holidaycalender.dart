@@ -1,17 +1,18 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 class HolidayCalendarAdminScreen extends StatefulWidget {
   @override
-  _HolidayCalendarAdminScreenState createState() => _HolidayCalendarAdminScreenState();
+  _HolidayCalendarAdminScreenState createState() =>
+      _HolidayCalendarAdminScreenState();
 }
 
-class _HolidayCalendarAdminScreenState extends State<HolidayCalendarAdminScreen> {
+class _HolidayCalendarAdminScreenState
+    extends State<HolidayCalendarAdminScreen> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
 
-  final List<Map<String, String>> holidays = [
+  List<Map<String, String>> holidays = [
     {
       'date': '2025-01-01',
       'name': 'New Year’s Day',
@@ -36,9 +37,107 @@ class _HolidayCalendarAdminScreenState extends State<HolidayCalendarAdminScreen>
   ];
 
   List<Map<String, String>> getHolidaysForDay(DateTime date) {
-    return holidays.where((h) => DateTime.parse(h['date']!).day == date.day &&
+    return holidays
+        .where((h) =>
+    DateTime.parse(h['date']!).day == date.day &&
         DateTime.parse(h['date']!).month == date.month &&
-        DateTime.parse(h['date']!).year == date.year).toList();
+        DateTime.parse(h['date']!).year == date.year)
+        .toList();
+  }
+
+  void _showAddHolidayDialog() {
+    final _formKey = GlobalKey<FormState>();
+    String name = '';
+    String type = '';
+    String region = '';
+    String notes = '';
+    DateTime selectedDate = DateTime.now();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text("Add Holiday"),
+          content: Form(
+            key: _formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  TextFormField(
+                    decoration: InputDecoration(labelText: "Holiday Name"),
+                    onChanged: (value) => name = value,
+                    validator: (value) =>
+                    value!.isEmpty ? "Enter holiday name" : null,
+                  ),
+                  TextFormField(
+                    decoration: InputDecoration(labelText: "Type"),
+                    onChanged: (value) => type = value,
+                    validator: (value) =>
+                    value!.isEmpty ? "Enter holiday type" : null,
+                  ),
+                  TextFormField(
+                    decoration: InputDecoration(labelText: "Region"),
+                    onChanged: (value) => region = value,
+                    validator: (value) =>
+                    value!.isEmpty ? "Enter holiday region" : null,
+                  ),
+                  TextFormField(
+                    decoration: InputDecoration(labelText: "Notes"),
+                    onChanged: (value) => notes = value,
+                  ),
+                  SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Text("Date: ${selectedDate.toLocal()}".split(' ')[0]),
+                      Spacer(),
+                      TextButton(
+                        child: Text("Pick Date"),
+                        onPressed: () async {
+                          DateTime? picked = await showDatePicker(
+                            context: context,
+                            initialDate: selectedDate,
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2030),
+                          );
+                          if (picked != null) {
+                            setState(() {
+                              selectedDate = picked;
+                            });
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: Text("Cancel"),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            ElevatedButton(
+              child: Text("Add"),
+              onPressed: () {
+                if (_formKey.currentState!.validate()) {
+                  setState(() {
+                    holidays.add({
+                      'date': selectedDate.toIso8601String().split('T')[0],
+                      'name': name,
+                      'type': type,
+                      'region':  region,
+                      'notes': notes
+                    });
+                  });
+                  Navigator.of(context).pop();
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -89,7 +188,8 @@ class _HolidayCalendarAdminScreenState extends State<HolidayCalendarAdminScreen>
                 final holiday = holidays[index];
                 return Card(
                   margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   child: ListTile(
                     leading: Icon(Icons.beach_access, color: Colors.teal),
                     title: Text(holiday['name']!),
@@ -106,7 +206,9 @@ class _HolidayCalendarAdminScreenState extends State<HolidayCalendarAdminScreen>
                         if (value == "edit") {
                           // TODO: Implement edit
                         } else if (value == "delete") {
-                          // TODO: Implement delete
+                          setState(() {
+                            holidays.removeAt(index);
+                          });
                         }
                       },
                     ),
@@ -118,9 +220,7 @@ class _HolidayCalendarAdminScreenState extends State<HolidayCalendarAdminScreen>
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // TODO: Show Add Holiday form
-        },
+        onPressed: _showAddHolidayDialog,
         child: Icon(Icons.add),
         tooltip: 'Add Holiday',
       ),

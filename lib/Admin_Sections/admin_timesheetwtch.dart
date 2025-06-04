@@ -10,7 +10,7 @@ class _TimesheetPageState extends State<TimesheetPage> {
   final List<Map<String, String>> timesheetData = [
     {
       'name': 'Harsh Singhal',
-      'profile': 'https://via.placeholder.com/150',
+      'image': 'https://via.placeholder.com/150',
       'date': '22 May 2025',
       'checkIn': '09:15 AM',
       'checkOut': '06:10 PM',
@@ -19,7 +19,7 @@ class _TimesheetPageState extends State<TimesheetPage> {
     },
     {
       'name': 'Mayank Singh',
-      'profile': 'https://via.placeholder.com/150',
+      'image': 'https://via.placeholder.com/150',
       'date': '22 May 2025',
       'checkIn': '09:00 AM',
       'checkOut': '06:00 PM',
