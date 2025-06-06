@@ -68,7 +68,7 @@ class _EmployeeFormState extends State<EmployeeForm> {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (_) => Center(child: CircularProgressIndicator()),
+        builder: (_) => const Center(child: CircularProgressIndicator()),
       );
 
       try {
@@ -78,10 +78,10 @@ class _EmployeeFormState extends State<EmployeeForm> {
         }
 
         Map<String, dynamic> employeeData = {
-          'name': _nameController.text,
-          'email': _emailController.text,
-          'phone': _phoneController.text,
-          'address': _addressController.text,
+          'name': _nameController.text.trim(),
+          'email': _emailController.text.trim(),
+          'phone': _phoneController.text.trim(),
+          'address': _addressController.text.trim(),
           'department': _selectedDepartment,
           'designation': _selectedDesignation,
           'joiningDate': _joiningDate,
@@ -91,19 +91,24 @@ class _EmployeeFormState extends State<EmployeeForm> {
           'createdAt': FieldValue.serverTimestamp(),
           'status': 'Active',
           'profileImage': profileImageUrl ?? '',
+          'password': _passwordController.text.trim(), // storing as is; consider hashing in real apps
         };
 
         await FirebaseFirestore.instance.collection('employees').add(employeeData);
 
-        Navigator.of(context).pop();
+        Navigator.of(context).pop(); // dismiss progress dialog
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Employee added successfully!'), backgroundColor: Colors.green),
+          const SnackBar(content: Text('Employee added successfully!'), backgroundColor: Colors.green),
         );
 
         _formKey.currentState!.reset();
         setState(() {
           _joiningDate = DateTime.now();
           _profileImage = null;
+          _selectedGender = 'Male';
+          _selectedDepartment = 'Development';
+          _selectedDesignation = 'Developer';
+          _selectedEmploymentType = 'Full-time';
         });
       } catch (e) {
         Navigator.of(context).pop();
@@ -114,70 +119,35 @@ class _EmployeeFormState extends State<EmployeeForm> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Add New Employee')),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: GestureDetector(
-                  onTap: _pickImage,
-                  child: CircleAvatar(
-                    radius: 50,
-                    backgroundColor: Colors.grey[300],
-                    backgroundImage: _profileImage != null ? FileImage(_profileImage!) : null,
-                    child: _profileImage == null ? Icon(Icons.add_a_photo, size: 40) : null,
-                  ),
-                ),
-              ),
-              SizedBox(height: 20),
-              _buildTextField(_nameController, 'Full Name', Icons.person),
-              _buildTextField(_emailController, 'Email', Icons.email),
-              _buildTextField(_phoneController, 'Phone', Icons.phone),
-              _buildTextField(_addressController, 'Address', Icons.home),
-              _buildDropdown(_selectedGender, 'Gender', Icons.person_outline, ['Male', 'Female', 'Other'],
-                      (value) => setState(() => _selectedGender = value)),
-              _buildDropdown(_selectedDepartment, 'Department', Icons.business, _departments,
-                      (value) => setState(() {
-                    _selectedDepartment = value;
-                    _selectedDesignation = _designations[value]!.first;
-                  })),
-              _buildDropdown(_selectedDesignation, 'Designation', Icons.work,
-                  _designations[_selectedDepartment]!,
-                      (value) => setState(() => _selectedDesignation = value)),
-              _buildDropdown(_selectedEmploymentType, 'Employment Type', Icons.access_time,
-                  ['Full-time', 'Part-time', 'Internship', 'Contract'],
-                      (value) => setState(() => _selectedEmploymentType = value)),
-              _buildDatePicker(),
-              _buildTextField(_salaryController, 'Monthly Salary', Icons.money, keyboardType: TextInputType.number),
-              _buildTextField(_passwordController, 'Temporary Password', Icons.lock, isPassword: true),
-              SizedBox(height: 20),
-              Center(
-                child: ElevatedButton(
-                  onPressed: _submitForm,
-                  style: ElevatedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(horizontal: 32, vertical: 14),
-                  ),
-                  child: Text('Submit'),
-                ),
-              )
-            ],
-          ),
-        ),
-      ),
-    );
+  String? _validateEmail(String? value) {
+    if (value == null || value.isEmpty) return 'Enter Email';
+    final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
+    if (!emailRegex.hasMatch(value)) return 'Enter valid Email';
+    return null;
+  }
+
+  String? _validatePhone(String? value) {
+    if (value == null || value.isEmpty) return 'Enter Phone number';
+    if (!RegExp(r'^[0-9]{10}$').hasMatch(value)) return 'Enter valid 10-digit phone number';
+    return null;
+  }
+
+  String? _validatePassword(String? value) {
+    if (value == null || value.isEmpty) return 'Enter Password';
+    if (value.length < 6) return 'Password must be at least 6 characters';
+    return null;
+  }
+
+  String? _validateSalary(String? value) {
+    if (value == null || value.isEmpty) return 'Enter Salary';
+    if (double.tryParse(value) == null) return 'Enter valid number';
+    return null;
   }
 
   Widget _buildTextField(TextEditingController controller, String label, IconData icon,
-      {bool isPassword = false, TextInputType keyboardType = TextInputType.text}) {
+      {bool isPassword = false, TextInputType keyboardType = TextInputType.text, String? Function(String?)? validator}) {
     return Padding(
-      padding: EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 12),
       child: TextFormField(
         controller: controller,
         obscureText: isPassword,
@@ -187,14 +157,14 @@ class _EmployeeFormState extends State<EmployeeForm> {
           prefixIcon: Icon(icon),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
         ),
-        validator: (value) => value == null || value.isEmpty ? 'Enter $label' : null,
+        validator: validator ?? (value) => value == null || value.isEmpty ? 'Enter $label' : null,
       ),
     );
   }
 
   Widget _buildDropdown(String currentValue, String label, IconData icon, List<String> items, ValueChanged<String> onChanged) {
     return Padding(
-      padding: EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 12),
       child: DropdownButtonFormField<String>(
         value: currentValue,
         decoration: InputDecoration(
@@ -210,7 +180,7 @@ class _EmployeeFormState extends State<EmployeeForm> {
 
   Widget _buildDatePicker() {
     return Padding(
-      padding: EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 12),
       child: InkWell(
         onTap: () async {
           final picked = await showDatePicker(
@@ -226,14 +196,74 @@ class _EmployeeFormState extends State<EmployeeForm> {
         child: InputDecorator(
           decoration: InputDecoration(
             labelText: 'Joining Date',
-            prefixIcon: Icon(Icons.calendar_today),
+            prefixIcon: const Icon(Icons.calendar_today),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("${_joiningDate.toLocal()}".split(' ')[0], style: TextStyle(fontSize: 16)),
-              Icon(Icons.edit_calendar),
+              Text("${_joiningDate.toLocal()}".split(' ')[0], style: const TextStyle(fontSize: 16)),
+              const Icon(Icons.edit_calendar),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Add New Employee')),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: GestureDetector(
+                  onTap: _pickImage,
+                  child: CircleAvatar(
+                    radius: 50,
+                    backgroundColor: Colors.grey[300],
+                    backgroundImage: _profileImage != null ? FileImage(_profileImage!) : null,
+                    child: _profileImage == null ? const Icon(Icons.add_a_photo, size: 40) : null,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              _buildTextField(_nameController, 'Full Name', Icons.person),
+              _buildTextField(_emailController, 'Email', Icons.email, keyboardType: TextInputType.emailAddress, validator: _validateEmail),
+              _buildTextField(_phoneController, 'Phone', Icons.phone, keyboardType: TextInputType.phone, validator: _validatePhone),
+              _buildTextField(_addressController, 'Address', Icons.home),
+              _buildDropdown(_selectedGender, 'Gender', Icons.person_outline, ['Male', 'Female', 'Other'],
+                      (value) => setState(() => _selectedGender = value)),
+              _buildDropdown(_selectedDepartment, 'Department', Icons.business, _departments,
+                      (value) => setState(() {
+                    _selectedDepartment = value;
+                    _selectedDesignation = _designations[value]!.first;
+                  })),
+              _buildDropdown(_selectedDesignation, 'Designation', Icons.work,
+                  _designations[_selectedDepartment]!,
+                      (value) => setState(() => _selectedDesignation = value)),
+              _buildDropdown(_selectedEmploymentType, 'Employment Type', Icons.access_time,
+                  ['Full-time', 'Part-time', 'Internship', 'Contract'],
+                      (value) => setState(() => _selectedEmploymentType = value)),
+              _buildDatePicker(),
+              _buildTextField(_salaryController, 'Monthly Salary', Icons.money, keyboardType: TextInputType.number, validator: _validateSalary),
+              _buildTextField(_passwordController, 'Temporary Password', Icons.lock, isPassword: true, validator: _validatePassword),
+              const SizedBox(height: 20),
+              Center(
+                child: ElevatedButton(
+                  onPressed: _submitForm,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                  ),
+                  child: const Text('Submit'),
+                ),
+              )
             ],
           ),
         ),

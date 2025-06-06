@@ -1,17 +1,6 @@
 import 'package:flutter/material.dart';
-
+import 'package:firebase_auth/firebase_auth.dart';
 import 'admin_profile.dart';
-
-// Dummy Profile Edit Screen
-class Profile_Screen extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Edit Profile')),
-      body: Center(child: Text('Profile Edit Screen')),
-    );
-  }
-}
 
 class AdminSetting extends StatefulWidget {
   @override
@@ -28,20 +17,20 @@ class _HRMSettingsScreenState extends State<AdminSetting> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Settings'),
+        title: const Text('Settings'),
         actions: [
           IconButton(
-            icon: Icon(Icons.save),
+            icon: const Icon(Icons.save),
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Settings saved successfully')),
+                const SnackBar(content: Text('Settings saved successfully')),
               );
             },
           ),
         ],
       ),
       body: ListView(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         children: [
           _buildSectionHeader('Account Settings', Icons.account_circle),
           _buildSettingsCard([
@@ -90,16 +79,16 @@ class _HRMSettingsScreenState extends State<AdminSetting> {
             _buildSettingsItem(
               icon: Icons.apps,
               title: 'App Version',
-              trailing: Text('1.0.0'),
+              trailing: const Text('1.0.0'),
             ),
             _buildSettingsItem(
               icon: Icons.update,
               title: 'Last Updated',
-              trailing: Text('May 2025'),
+              trailing: const Text('May 2025'),
             ),
           ]),
 
-          SizedBox(height: 20),
+          const SizedBox(height: 20),
           _buildLogoutButton(),
         ],
       ),
@@ -108,14 +97,14 @@ class _HRMSettingsScreenState extends State<AdminSetting> {
 
   Widget _buildSectionHeader(String title, IconData icon) {
     return Padding(
-      padding: EdgeInsets.only(top: 16, bottom: 8),
+      padding: const EdgeInsets.only(top: 16, bottom: 8),
       child: Row(
         children: [
           Icon(icon, size: 20, color: Colors.blue),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           Text(
             title,
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
         ],
       ),
@@ -125,7 +114,7 @@ class _HRMSettingsScreenState extends State<AdminSetting> {
   Widget _buildSettingsCard(List<Widget> children) {
     return Card(
       elevation: 1,
-      margin: EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 16),
       child: Column(children: children),
     );
   }
@@ -139,24 +128,23 @@ class _HRMSettingsScreenState extends State<AdminSetting> {
     return ListTile(
       leading: Icon(icon, size: 22),
       title: Text(title),
-      trailing: trailing ?? Icon(Icons.chevron_right),
+      trailing: trailing ?? const Icon(Icons.chevron_right),
       onTap: onTap,
     );
   }
 
   Widget _buildLogoutButton() {
     return ElevatedButton.icon(
-      icon: Icon(Icons.logout),
-      label: Text('Logout'),
+      icon: const Icon(Icons.logout),
+      label: const Text('Logout'),
       style: ElevatedButton.styleFrom(
-        backgroundColor: Color(0xFFCFD8DC),
-        padding: EdgeInsets.symmetric(vertical: 16),
+        backgroundColor: const Color(0xFFCFD8DC),
+        padding: const EdgeInsets.symmetric(vertical: 16),
       ),
       onPressed: () => _confirmLogout(context),
     );
   }
 
-  // Function to navigate to the Profile Edit Screen
   void _navigateToProfileEdit(BuildContext context) {
     Navigator.push(
       context,
@@ -165,56 +153,130 @@ class _HRMSettingsScreenState extends State<AdminSetting> {
   }
 
   void _showChangePasswordDialog(BuildContext context) {
+    final currentPassController = TextEditingController();
+    final newPassController = TextEditingController();
+    final confirmPassController = TextEditingController();
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Change Password'),
+        title: const Text('Change Password'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(decoration: InputDecoration(labelText: 'Current Password')),
-            TextField(decoration: InputDecoration(labelText: 'New Password')),
-            TextField(decoration: InputDecoration(labelText: 'Confirm Password')),
+            TextField(
+              controller: currentPassController,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Current Password'),
+            ),
+            TextField(
+              controller: newPassController,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'New Password'),
+            ),
+            TextField(
+              controller: confirmPassController,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Confirm Password'),
+            ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel')),
-          ElevatedButton(onPressed: () => Navigator.pop(context), child: Text('Save')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final currentPassword = currentPassController.text.trim();
+              final newPassword = newPassController.text.trim();
+              final confirmPassword = confirmPassController.text.trim();
+
+              if (newPassword != confirmPassword) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('New password and confirmation do not match'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+
+              try {
+                final user = FirebaseAuth.instance.currentUser;
+                final cred = EmailAuthProvider.credential(
+                  email: user!.email!,
+                  password: currentPassword,
+                );
+
+                await user.reauthenticateWithCredential(cred);
+                await user.updatePassword(newPassword);
+
+                Navigator.pop(context); // Close dialog
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Password updated successfully'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              } on FirebaseAuthException catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(e.message ?? 'Failed to change password'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            child: const Text('Save'),
+          ),
         ],
       ),
     );
   }
 
   void _openFAQs(BuildContext context) {
-    // Open FAQs logic
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('FAQs clicked')),
+    );
   }
 
   void _reportProblem(BuildContext context) {
-    // Report problem logic
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Report Problem clicked')),
+    );
   }
 
   void _openPrivacyPolicy(BuildContext context) {
-    // Open privacy policy logic
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Privacy Policy clicked')),
+    );
   }
 
   void _openTerms(BuildContext context) {
-    // Open terms logic
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Terms of Service clicked')),
+    );
   }
 
   void _confirmLogout(BuildContext context) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Logout'),
-        content: Text('Are you sure you want to logout?'),
+        title: const Text('Logout'),
+        content: const Text('Are you sure you want to logout?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
               Navigator.pop(context);
-              // Perform logout logic
+              Navigator.pop(context); // Optional: navigate to login screen
             },
-            child: Text('Logout'),
+            child: const Text('Logout'),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
           ),
         ],
