@@ -1,4 +1,3 @@
-// ignore_for_file: use_key_in_widget_constructors, library_private_types_in_public_api
 
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -22,11 +21,19 @@ class _EmployeeFormState extends State<EmployeeForm> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _salaryController = TextEditingController();
 
+  // New controllers for emergency contact
+  final TextEditingController _emergencyContactNameController = TextEditingController();
+  final TextEditingController _emergencyContactRelationController = TextEditingController();
+  final TextEditingController _emergencyContactPhoneController = TextEditingController();
+
   String _selectedGender = 'Male';
   String _selectedDepartment = 'Development';
   String _selectedDesignation = 'Developer';
   String _selectedEmploymentType = 'Full-time';
   DateTime _joiningDate = DateTime.now();
+
+  // New date of birth
+  DateTime _dateOfBirth = DateTime(1990, 1, 1);
 
   File? _profileImage;
   final picker = ImagePicker();
@@ -92,6 +99,11 @@ class _EmployeeFormState extends State<EmployeeForm> {
           'status': 'Active',
           'profileImage': profileImageUrl ?? '',
           'password': _passwordController.text.trim(), // storing as is; consider hashing in real apps
+          'dateOfBirth': _dateOfBirth,
+          // Emergency contact fields
+          'emergencyContactName': _emergencyContactNameController.text.trim(),
+          'emergencyContactRelation': _emergencyContactRelationController.text.trim(),
+          'emergencyContactPhone': _emergencyContactPhoneController.text.trim(),
         };
 
         await FirebaseFirestore.instance.collection('employees').add(employeeData);
@@ -104,6 +116,7 @@ class _EmployeeFormState extends State<EmployeeForm> {
         _formKey.currentState!.reset();
         setState(() {
           _joiningDate = DateTime.now();
+          _dateOfBirth = DateTime(1990, 1, 1);
           _profileImage = null;
           _selectedGender = 'Male';
           _selectedDepartment = 'Development';
@@ -144,6 +157,11 @@ class _EmployeeFormState extends State<EmployeeForm> {
     return null;
   }
 
+  String? _validateNonEmpty(String? value, String fieldName) {
+    if (value == null || value.isEmpty) return 'Enter $fieldName';
+    return null;
+  }
+
   Widget _buildTextField(TextEditingController controller, String label, IconData icon,
       {bool isPassword = false, TextInputType keyboardType = TextInputType.text, String? Function(String?)? validator}) {
     return Padding(
@@ -178,31 +196,31 @@ class _EmployeeFormState extends State<EmployeeForm> {
     );
   }
 
-  Widget _buildDatePicker() {
+  Widget _buildDatePicker({required String label, required DateTime selectedDate, required ValueChanged<DateTime> onDateSelected}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: InkWell(
         onTap: () async {
           final picked = await showDatePicker(
             context: context,
-            initialDate: _joiningDate,
-            firstDate: DateTime(2000),
+            initialDate: selectedDate,
+            firstDate: DateTime(1900),
             lastDate: DateTime(2100),
           );
-          if (picked != null && picked != _joiningDate) {
-            setState(() => _joiningDate = picked);
+          if (picked != null && picked != selectedDate) {
+            onDateSelected(picked);
           }
         },
         child: InputDecorator(
           decoration: InputDecoration(
-            labelText: 'Joining Date',
+            labelText: label,
             prefixIcon: const Icon(Icons.calendar_today),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("${_joiningDate.toLocal()}".split(' ')[0], style: const TextStyle(fontSize: 16)),
+              Text("${selectedDate.toLocal()}".split(' ')[0], style: const TextStyle(fontSize: 16)),
               const Icon(Icons.edit_calendar),
             ],
           ),
@@ -251,9 +269,16 @@ class _EmployeeFormState extends State<EmployeeForm> {
               _buildDropdown(_selectedEmploymentType, 'Employment Type', Icons.access_time,
                   ['Full-time', 'Part-time', 'Internship', 'Contract'],
                       (value) => setState(() => _selectedEmploymentType = value)),
-              _buildDatePicker(),
+              _buildDatePicker(label: 'Joining Date', selectedDate: _joiningDate, onDateSelected: (date) => setState(() => _joiningDate = date)),
+              _buildDatePicker(label: 'Date of Birth', selectedDate: _dateOfBirth, onDateSelected: (date) => setState(() => _dateOfBirth = date)),
               _buildTextField(_salaryController, 'Monthly Salary', Icons.money, keyboardType: TextInputType.number, validator: _validateSalary),
               _buildTextField(_passwordController, 'Temporary Password', Icons.lock, isPassword: true, validator: _validatePassword),
+              const SizedBox(height: 20),
+              const Text("Emergency Contact Details", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 10),
+              _buildTextField(_emergencyContactNameController, 'Emergency Contact Name', Icons.person, validator: (val) => _validateNonEmpty(val, 'Emergency Contact Name')),
+              _buildTextField(_emergencyContactRelationController, 'Emergency Contact Relation', Icons.people, validator: (val) => _validateNonEmpty(val, 'Emergency Contact Relation')),
+              _buildTextField(_emergencyContactPhoneController, 'Emergency Contact Phone', Icons.phone, keyboardType: TextInputType.phone, validator: _validatePhone),
               const SizedBox(height: 20),
               Center(
                 child: ElevatedButton(

@@ -17,9 +17,16 @@ class _AttendanceScreenState extends State<AttendanceScreen> with SingleTickerPr
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
 
-  bool isCheckedIn = false; // Track check-in or check-out state
+  bool isCheckedIn = false;
+
+  DateTime? checkInTime;
+  DateTime? checkOutTime;
+  Duration? workedDuration;
 
   final GlobalKey<SlideActionState> _slideKey = GlobalKey();
+
+  // Attendance record structure
+  List<Map<String, dynamic>> recentAttendance = [];
 
   @override
   void initState() {
@@ -57,6 +64,24 @@ class _AttendanceScreenState extends State<AttendanceScreen> with SingleTickerPr
     await _animationController.reverse();
 
     setState(() {
+      if (!isCheckedIn) {
+        // Check-in logic
+        checkInTime = DateTime.now();
+        checkOutTime = null;
+        workedDuration = null;
+      } else {
+        // Check-out logic
+        checkOutTime = DateTime.now();
+        if (checkInTime != null) {
+          workedDuration = checkOutTime!.difference(checkInTime!);
+          recentAttendance.insert(0, {
+            'date': DateFormat('dd MMM yyyy').format(checkInTime!),
+            'checkIn': DateFormat('hh:mm a').format(checkInTime!),
+            'checkOut': DateFormat('hh:mm a').format(checkOutTime!),
+            'worked': formatDuration(workedDuration),
+          });
+        }
+      }
       isCheckedIn = !isCheckedIn;
     });
 
@@ -67,8 +92,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> with SingleTickerPr
       ),
     );
 
-    // Reset the slider so user can slide again
     _slideKey.currentState?.reset();
+  }
+
+  String formatDuration(Duration? duration) {
+    if (duration == null) return '--';
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    return '$hours hr ${minutes.toString().padLeft(2, '0')} min';
   }
 
   @override
@@ -109,37 +140,42 @@ class _AttendanceScreenState extends State<AttendanceScreen> with SingleTickerPr
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text("Today’s Summary",
+                    children: [
+                      const Text("Today’s Summary",
                           style: TextStyle(
                               fontSize: 18, fontWeight: FontWeight.bold)),
-                      SizedBox(height: 12),
+                      const SizedBox(height: 12),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Column(
                             children: [
-                              Icon(Icons.login, color: Colors.green),
-                              SizedBox(height: 4),
-                              Text("Check-In\n09:20 AM",
-                                  textAlign: TextAlign.center),
+                              const Icon(Icons.login, color: Colors.green),
+                              const SizedBox(height: 4),
+                              Text(
+                                "Check-In\n${checkInTime != null ? DateFormat('hh:mm a').format(checkInTime!) : '--'}",
+                                textAlign: TextAlign.center,
+                              ),
                             ],
                           ),
                           Column(
                             children: [
-                              Icon(Icons.logout, color: Colors.redAccent),
-                              SizedBox(height: 4),
-                              Text("Check-Out\n--",
-                                  textAlign: TextAlign.center),
+                              const Icon(Icons.logout, color: Colors.redAccent),
+                              const SizedBox(height: 4),
+                              Text(
+                                "Check-Out\n${checkOutTime != null ? DateFormat('hh:mm a').format(checkOutTime!) : '--'}",
+                                textAlign: TextAlign.center,
+                              ),
                             ],
                           ),
                           Column(
                             children: [
-                              Icon(Icons.access_time_filled,
-                                  color: Colors.orange),
-                              SizedBox(height: 4),
-                              Text("Worked\n--",
-                                  textAlign: TextAlign.center),
+                              const Icon(Icons.access_time_filled, color: Colors.orange),
+                              const SizedBox(height: 4),
+                              Text(
+                                "Worked\n${formatDuration(workedDuration)}",
+                                textAlign: TextAlign.center,
+                              ),
                             ],
                           ),
                         ],
@@ -184,11 +220,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> with SingleTickerPr
                 ),
               ),
               const SizedBox(height: 12),
+
               ListView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                itemCount: 3,
+                itemCount: recentAttendance.length,
                 itemBuilder: (context, index) {
+                  final item = recentAttendance[index];
                   return ListTile(
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -198,11 +236,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> with SingleTickerPr
                       backgroundColor: Colors.blueGrey,
                       child: Icon(Icons.calendar_today, color: Colors.white),
                     ),
-                    title: const Text("10 May 2025",
-                        style: TextStyle(color: Colors.black)),
-                    subtitle: const Text("Check-In: 09:15 AM | Check-Out: 06:10 PM",
-                        style: TextStyle(color: Colors.black54)),
-                    trailing: const Icon(Icons.check_circle, color: Colors.green),
+                    title: Text(item['date'], style: const TextStyle(color: Colors.black)),
+                    subtitle: Text("Check-In: ${item['checkIn']} | Check-Out: ${item['checkOut']}",
+                        style: const TextStyle(color: Colors.black54)),
+                    trailing: Text(item['worked'], style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
                   );
                 },
               )
