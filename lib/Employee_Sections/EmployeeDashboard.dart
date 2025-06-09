@@ -16,7 +16,6 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
   bool _isCheckedIn = false;
   int _currentIndex = 0;
 
-  // Handle Check-In/Out
   void _handleCheckInOut() {
     setState(() {
       _isCheckedIn = !_isCheckedIn;
@@ -28,7 +27,6 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
     );
   }
 
-  // Build Stat Card Widget
   Widget _buildStatCard(String value, String label, IconData icon) {
     return Card(
       elevation: 1,
@@ -52,7 +50,6 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
     );
   }
 
-  // Navigation Handler
   void _onItemTapped(int index) {
     if (index == 1) {
       Navigator.push(
@@ -63,7 +60,8 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => ProfileScreen(employeeId: widget.employeeData['employeeId']),
+          builder: (context) =>
+              ProfileScreen(employeeData: widget.employeeData),
         ),
       );
     } else {
@@ -73,7 +71,6 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     final employeeName = widget.employeeData['name'] ?? 'Employee';
@@ -81,11 +78,11 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
         "https://randomuser.me/api/portraits/men/1.jpg";
 
     return Scaffold(
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
             children: [
-              // Welcome Section
               Padding(
                 padding: EdgeInsets.all(16),
                 child: Row(
@@ -94,10 +91,12 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text("Good Morning,",
-                            style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+                            style:
+                            TextStyle(color: Colors.grey[600], fontSize: 14)),
                         SizedBox(height: 4),
                         Text(employeeName,
-                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                            style: TextStyle(
+                                fontSize: 22, fontWeight: FontWeight.bold)),
                       ],
                     ),
                     Spacer(),
@@ -108,13 +107,11 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
                   ],
                 ),
               ),
-
-              // Check-In/Out Button
               Container(
                 margin: EdgeInsets.symmetric(vertical: 20),
                 child: FloatingActionButton.extended(
                   onPressed: _handleCheckInOut,
-                  backgroundColor: Colors.blue[600],
+                  backgroundColor: _isCheckedIn ? Colors.red : Colors.green,
                   elevation: 0,
                   label: Text(
                     _isCheckedIn ? "CHECK OUT" : "CHECK IN",
@@ -126,8 +123,6 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
                   ),
                 ),
               ),
-
-              // Stats Grid
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16),
                 child: GridView.count(
@@ -142,28 +137,29 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
                   ],
                 ),
               ),
-
-              // Recent Activities
               Padding(
                 padding: EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text("Recent Activities",
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        style:
+                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     SizedBox(height: 12),
                     ListTile(
                       leading: Icon(Icons.check_circle, color: Colors.green),
                       title: Text("Leave Approved"),
                       subtitle: Text("Sick leave for June 10-12"),
-                      trailing: Text("Today", style: TextStyle(color: Colors.grey)),
+                      trailing:
+                      Text("Today", style: TextStyle(color: Colors.grey)),
                     ),
                     Divider(height: 1),
                     ListTile(
                       leading: Icon(Icons.notifications, color: Colors.orange),
                       title: Text("New Announcement"),
                       subtitle: Text("Office closed on July 4"),
-                      trailing: Text("Yesterday", style: TextStyle(color: Colors.grey)),
+                      trailing:
+                      Text("Yesterday", style: TextStyle(color: Colors.grey)),
                     ),
                   ],
                 ),
@@ -172,8 +168,6 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
           ),
         ),
       ),
-
-      // Bottom Navigation Bar
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: _onItemTapped,

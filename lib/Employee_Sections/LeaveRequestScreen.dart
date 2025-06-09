@@ -80,6 +80,7 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
   String _formatDate(DateTime? date) {
     if (date == null) return 'Select Date';
     return DateFormat('dd MMM yyyy').format(date);
+  
   }
 
   Color _statusColor(String status) {

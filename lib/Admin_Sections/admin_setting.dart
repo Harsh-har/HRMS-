@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'admin_login.dart';
 import 'admin_profile.dart';
 
 class AdminSetting extends StatefulWidget {
@@ -273,8 +274,10 @@ class _HRMSettingsScreenState extends State<AdminSetting> {
           ElevatedButton(
             onPressed: () async {
               await FirebaseAuth.instance.signOut();
-              Navigator.pop(context);
-              Navigator.pop(context); // Optional: navigate to login screen
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (context) => LoginScreen()),
+                    (Route<dynamic> route) => false,
+              );
             },
             child: const Text('Logout'),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
