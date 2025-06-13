@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 void main() => runApp(MyApp());
 
@@ -13,39 +14,6 @@ class MyApp extends StatelessWidget {
 }
 
 class LeaveRequestsPage extends StatelessWidget {
-  final List<Map<String, String>> leaveRequests = [
-    {
-      'name': 'Harsh Singhal',
-      'type': 'Sick Leave',
-      'date': '9 May - 19 Nov 2025',
-      'duration': '1 day(s)',
-      'reason': 'High fever',
-      'applied': '19 nov 2022',
-      'balance': '',
-      'image': 'https://via.placeholder.com/150'
-    },
-    {
-      'name': 'Mayank',
-      'type': 'Unpaid Leave',
-      'date': '9 May - 19 Nov 2025',
-      'duration': '1 day(s)',
-      'reason': 'Going to village due to urgency',
-      'applied': '19 nov 2022',
-      'balance': '',
-      'image': 'https://via.placeholder.com/150'
-    },
-    {
-      'name': 'Ansh',
-      'type': 'Unpaid Leave',
-      'date': '9 May - 19 Nov 2025',
-      'duration': '1 day(s)',
-      'reason': 'High fever',
-      'applied': '19 nov 2022',
-      'balance': '0 day(s)',
-      'image': 'https://via.placeholder.com/150'
-    },
-  ];
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -87,110 +55,140 @@ class LeaveRequestsPage extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: ListView.builder(
-              itemCount: leaveRequests.length,
-              itemBuilder: (context, index) {
-                final request = leaveRequests[index];
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
-                  child: Card(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    elevation: 4,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('leave_requests')
+                  .where('status', isEqualTo: 'Pending') // Show only pending
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Center(child: CircularProgressIndicator());
+                }
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return Center(child: Text('No pending leave requests.'));
+                }
+
+                final leaveRequests = snapshot.data!.docs;
+
+                return ListView.builder(
+                  itemCount: leaveRequests.length,
+                  itemBuilder: (context, index) {
+                    final doc = leaveRequests[index];
+                    final request = doc.data() as Map<String, dynamic>;
+
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
+                      child: Card(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        elevation: 4,
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              CircleAvatar(
-                                backgroundImage: NetworkImage(request['image']!),
-                                radius: 24,
-                              ),
-                              SizedBox(width: 12),
-                              Text(
-                                request['name']!,
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                              ),
-                              Spacer(),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
+                              Row(
                                 children: [
-                                  Container(
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      border: Border.all(
-                                        color: request['type'] == 'Sick Leave'
-                                            ? Colors.green
-                                            : Colors.blue,
-                                      ),
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  CircleAvatar(
+                                    backgroundImage: NetworkImage(request['image'] ?? 'https://via.placeholder.com/150'),
+                                    radius: 24,
+                                  ),
+                                  SizedBox(width: 12),
+                                  Expanded(
                                     child: Text(
-                                      request['type']!,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: request['type'] == 'Sick Leave'
-                                            ? Colors.green
-                                            : Colors.blue,
-                                      ),
+                                      request['name'] ?? '',
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                                     ),
                                   ),
-                                  SizedBox(height: 4),
-                                  Text('Applied on\n${request['applied']}'),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Container(
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          border: Border.all(
+                                            color: request['type'] == 'Sick Leave'
+                                                ? Colors.green
+                                                : Colors.blue,
+                                          ),
+                                          borderRadius: BorderRadius.circular(16),
+                                        ),
+                                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                        child: Text(
+                                          request['type'] ?? '',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: request['type'] == 'Sick Leave'
+                                                ? Colors.green
+                                                : Colors.blue,
+                                          ),
+                                        ),
+                                      ),
+                                      SizedBox(height: 4),
+                                      Text('Applied on\n${request['applied'] ?? ''}', textAlign: TextAlign.right),
+                                    ],
+                                  )
+                                ],
+                              ),
+                              SizedBox(height: 12),
+                              Text('Leave Date\n${request['date'] ?? ''}'),
+                              SizedBox(height: 4),
+                              Text('Duration\n${request['duration'] ?? ''}'),
+                              if ((request['balance'] ?? '').toString().isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4.0),
+                                  child: Text('Leave Balance\n${request['balance']}'),
+                                ),
+                              SizedBox(height: 4),
+                              Text('Reason\n${request['reason'] ?? ''}'),
+                              SizedBox(height: 12),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      FirebaseFirestore.instance
+                                          .collection('leave_requests')
+                                          .doc(doc.id)
+                                          .update({'status': 'Approved'});
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.green.shade100,
+                                      foregroundColor: Colors.green.shade900,
+                                    ),
+                                    child: Text('APPROVE'),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      FirebaseFirestore.instance
+                                          .collection('leave_requests')
+                                          .doc(doc.id)
+                                          .update({'status': 'Rejected'});
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red.shade100,
+                                      foregroundColor: Colors.red.shade900,
+                                    ),
+                                    child: Text('REJECT'),
+                                  ),
                                 ],
                               )
                             ],
                           ),
-                          SizedBox(height: 12),
-                          Text('Leave Date\n${request['date']}'),
-                          Text('Duration\n${request['duration']}'),
-                          if (request['balance']!.isNotEmpty)
-                            Text('Leave Balance\n${request['balance']}'),
-                          Text('Reason\n${request['reason']}'),
-                          SizedBox(height: 12),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              ElevatedButton(
-                                onPressed: () {},
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green.shade100,
-                                  foregroundColor: Colors.green.shade900,
-                                ),
-                                child: Text('APPROVE'),
-                              ),
-                              ElevatedButton(
-                                onPressed: () {},
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red.shade100,
-                                  foregroundColor: Colors.red.shade900,
-                                ),
-                                child: Text('REJECT'),
-                              ),
-                              // TextButton(
-                              //   onPressed: () {},
-                              //   child: Text('EDIT'),
-                              // )
-                            ],
-                          )
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 );
               },
             ),
           )
         ],
       ),
-      // Bottom Navigation
       bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed, // Important to allow backgroundColor
+        type: BottomNavigationBarType.fixed,
         selectedItemColor: Colors.white,
         unselectedItemColor: Colors.grey,
-        backgroundColor: Colors.black, // This sets the background- color
+        backgroundColor: Colors.black,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
           BottomNavigationBarItem(icon: Icon(Icons.insert_chart), label: 'Projects'),

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-
-import 'AttendanceScreen.dart';
-import 'ProfileScreen.dart';
+import 'package:intl/intl.dart';
+import 'package:hrms_project/Employee_Sections/AttendanceScreen.dart';
+import 'package:hrms_project/Employee_Sections/ProfileScreen.dart';
+import 'package:hrms_project/Employee_Sections/LeaveRequestScreen.dart'; // Correctly import the updated leave screen
 
 class EmployeeDashboard extends StatefulWidget {
   final Map<String, dynamic> employeeData;
@@ -25,6 +26,23 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
         content: Text(_isCheckedIn ? "Checked In Successfully" : "Checked Out"),
       ),
     );
+  }
+
+  String _getGreetingWithDate() {
+    final now = DateTime.now();
+    final hour = now.hour;
+
+    String greeting;
+    if (hour < 12) {
+      greeting = "Good Morning";
+    } else if (hour < 17) {
+      greeting = "Good Afternoon";
+    } else {
+      greeting = "Good Evening";
+    }
+
+    String formattedDate = DateFormat('d MMMM yyyy').format(now);
+    return "$greeting, $formattedDate";
   }
 
   Widget _buildStatCard(String value, String label, IconData icon) {
@@ -54,7 +72,17 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
     if (index == 1) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => AttendanceScreen()),
+        MaterialPageRoute(
+            builder: (context) =>
+                AttendanceScreen(employeeData: widget.employeeData)),
+      );
+    } else if (index == 2) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) =>
+              SubmitLeaveRequestPage(employeeData: widget.employeeData),
+        ),
       );
     } else if (index == 3) {
       Navigator.push(
@@ -64,11 +92,11 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
               ProfileScreen(employeeData: widget.employeeData),
         ),
       );
-    } else {
-      setState(() {
-        _currentIndex = index;
-      });
     }
+
+    setState(() {
+      _currentIndex = index;
+    });
   }
 
   @override
@@ -87,19 +115,24 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
                 padding: EdgeInsets.all(16),
                 child: Row(
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text("Good Morning,",
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _getGreetingWithDate(),
                             style:
-                            TextStyle(color: Colors.grey[600], fontSize: 14)),
-                        SizedBox(height: 4),
-                        Text(employeeName,
+                            TextStyle(color: Colors.grey[600], fontSize: 14),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            employeeName,
                             style: TextStyle(
-                                fontSize: 22, fontWeight: FontWeight.bold)),
-                      ],
+                                fontSize: 22, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
                     ),
-                    Spacer(),
                     CircleAvatar(
                       radius: 24,
                       backgroundImage: NetworkImage(profileUrl),
@@ -143,13 +176,13 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text("Recent Activities",
-                        style:
-                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold)),
                     SizedBox(height: 12),
                     ListTile(
                       leading: Icon(Icons.check_circle, color: Colors.green),
                       title: Text("Leave Approved"),
-                      subtitle: Text("Sick leave for June 10-12"),
+                      subtitle: Text("Sick leave for June 10–12"),
                       trailing:
                       Text("Today", style: TextStyle(color: Colors.grey)),
                     ),
@@ -158,8 +191,8 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
                       leading: Icon(Icons.notifications, color: Colors.orange),
                       title: Text("New Announcement"),
                       subtitle: Text("Office closed on July 4"),
-                      trailing:
-                      Text("Yesterday", style: TextStyle(color: Colors.grey)),
+                      trailing: Text("Yesterday",
+                          style: TextStyle(color: Colors.grey)),
                     ),
                   ],
                 ),
@@ -177,8 +210,10 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
         unselectedItemColor: Colors.grey[500],
         items: [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-          BottomNavigationBarItem(icon: Icon(Icons.access_time), label: "Attendance"),
-          BottomNavigationBarItem(icon: Icon(Icons.leave_bags_at_home), label: "Leave"),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.access_time), label: "Attendance"),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.leave_bags_at_home), label: "Leave"),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
         ],
       ),

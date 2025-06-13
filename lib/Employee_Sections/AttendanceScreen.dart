@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:slide_to_act/slide_to_act.dart';
 
 class AttendanceScreen extends StatefulWidget {
-  const AttendanceScreen({super.key});
+  final Map<String, dynamic> employeeData;
+  const AttendanceScreen({super.key, required this.employeeData});
 
   @override
   State<AttendanceScreen> createState() => _AttendanceScreenState();
@@ -18,14 +20,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> with SingleTickerPr
   late Animation<double> _scaleAnimation;
 
   bool isCheckedIn = false;
-
   DateTime? checkInTime;
   DateTime? checkOutTime;
   Duration? workedDuration;
 
   final GlobalKey<SlideActionState> _slideKey = GlobalKey();
-
-  // Attendance record structure
   List<Map<String, dynamic>> recentAttendance = [];
 
   @override
@@ -42,6 +41,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> with SingleTickerPr
     _scaleAnimation = Tween<double>(begin: 1.0, end: 1.1).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
+
+    _fetchTodayAttendance();
+    _fetchRecentAttendance();
   }
 
   void _updateTime() {
@@ -52,38 +54,72 @@ class _AttendanceScreenState extends State<AttendanceScreen> with SingleTickerPr
     });
   }
 
-  @override
-  void dispose() {
-    _timer.cancel();
-    _animationController.dispose();
-    super.dispose();
+  Future<void> _fetchTodayAttendance() async {
+    final today = DateFormat('dd-MM-yyyy').format(DateTime.now());
+    final doc = await FirebaseFirestore.instance
+        .collection('attendance')
+        .doc('${widget.employeeData['name']}_$today')
+        .get();
+
+    if (doc.exists) {
+      final data = doc.data()!;
+      setState(() {
+        checkInTime = data['checkIn'] != null ? DateFormat('hh:mm a').parse(data['checkIn']) : null;
+        checkOutTime = data['checkOut'] != null ? DateFormat('hh:mm a').parse(data['checkOut']) : null;
+        workedDuration = data['worked'] != null
+            ? Duration(
+            minutes: int.parse(data['worked'].split(' ')[0]) * 60 +
+                int.parse(data['worked'].split(' ')[2]))
+            : null;
+        isCheckedIn = checkInTime != null && checkOutTime == null;
+      });
+    }
+  }
+
+  Future<void> _fetchRecentAttendance() async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('attendance')
+        .where('name', isEqualTo: widget.employeeData['name'])
+        .orderBy('timestamp', descending: true)
+        .limit(7)
+        .get();
+
+    setState(() {
+      recentAttendance = snapshot.docs.map((doc) => doc.data()).toList();
+    });
   }
 
   Future<void> _handleSlideComplete() async {
     await _animationController.forward();
     await _animationController.reverse();
 
-    setState(() {
-      if (!isCheckedIn) {
-        // Check-in logic
-        checkInTime = DateTime.now();
-        checkOutTime = null;
-        workedDuration = null;
-      } else {
-        // Check-out logic
-        checkOutTime = DateTime.now();
-        if (checkInTime != null) {
-          workedDuration = checkOutTime!.difference(checkInTime!);
-          recentAttendance.insert(0, {
-            'date': DateFormat('dd MMM yyyy').format(checkInTime!),
-            'checkIn': DateFormat('hh:mm a').format(checkInTime!),
-            'checkOut': DateFormat('hh:mm a').format(checkOutTime!),
-            'worked': formatDuration(workedDuration),
-          });
-        }
+    final now = DateTime.now();
+    final today = DateFormat('dd-MM-yyyy').format(now);
+    final docRef = FirebaseFirestore.instance.collection('attendance').doc('${widget.employeeData['name']}_$today');
+
+    if (!isCheckedIn && checkInTime == null) {
+      checkInTime = now;
+      await docRef.set({
+        'name': widget.employeeData['name'],
+        'date': DateFormat('dd MMM yyyy').format(now),
+        'checkIn': DateFormat('hh:mm a').format(now),
+        'timestamp': FieldValue.serverTimestamp()
+      });
+      isCheckedIn = true;
+    } else if (isCheckedIn && checkOutTime == null) {
+      checkOutTime = now;
+      if (checkInTime != null) {
+        workedDuration = checkOutTime!.difference(checkInTime!);
+        await docRef.update({
+          'checkOut': DateFormat('hh:mm a').format(now),
+          'worked': formatDuration(workedDuration)
+        });
+        isCheckedIn = false;
       }
-      isCheckedIn = !isCheckedIn;
-    });
+    }
+
+    setState(() {}); // Refresh UI
+    _fetchRecentAttendance();
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -100,6 +136,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> with SingleTickerPr
     final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60);
     return '$hours hr ${minutes.toString().padLeft(2, '0')} min';
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    _animationController.dispose();
+    super.dispose();
   }
 
   @override
@@ -129,7 +172,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> with SingleTickerPr
                 ),
               ),
               const SizedBox(height: 24),
-
               Card(
                 color: Colors.grey[100],
                 shape: RoundedRectangleBorder(
@@ -142,8 +184,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> with SingleTickerPr
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text("Today’s Summary",
-                          style: TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.bold)),
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 12),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -152,30 +193,24 @@ class _AttendanceScreenState extends State<AttendanceScreen> with SingleTickerPr
                             children: [
                               const Icon(Icons.login, color: Colors.green),
                               const SizedBox(height: 4),
-                              Text(
-                                "Check-In\n${checkInTime != null ? DateFormat('hh:mm a').format(checkInTime!) : '--'}",
-                                textAlign: TextAlign.center,
-                              ),
+                              Text("Check-In\n${checkInTime != null ? DateFormat('hh:mm a').format(checkInTime!) : '--'}",
+                                  textAlign: TextAlign.center),
                             ],
                           ),
                           Column(
                             children: [
                               const Icon(Icons.logout, color: Colors.redAccent),
                               const SizedBox(height: 4),
-                              Text(
-                                "Check-Out\n${checkOutTime != null ? DateFormat('hh:mm a').format(checkOutTime!) : '--'}",
-                                textAlign: TextAlign.center,
-                              ),
+                              Text("Check-Out\n${checkOutTime != null ? DateFormat('hh:mm a').format(checkOutTime!) : '--'}",
+                                  textAlign: TextAlign.center),
                             ],
                           ),
                           Column(
                             children: [
                               const Icon(Icons.access_time_filled, color: Colors.orange),
                               const SizedBox(height: 4),
-                              Text(
-                                "Worked\n${formatDuration(workedDuration)}",
-                                textAlign: TextAlign.center,
-                              ),
+                              Text("Worked\n${formatDuration(workedDuration)}",
+                                  textAlign: TextAlign.center),
                             ],
                           ),
                         ],
@@ -184,10 +219,20 @@ class _AttendanceScreenState extends State<AttendanceScreen> with SingleTickerPr
                   ),
                 ),
               ),
-
               const SizedBox(height: 24),
 
-              ScaleTransition(
+              // Check if both Check-In and Check-Out done
+              (checkInTime != null && checkOutTime != null)
+                  ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(
+                    "You have already checked in and out today.",
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              )
+                  : ScaleTransition(
                 scale: _scaleAnimation,
                 child: SlideAction(
                   key: _slideKey,
@@ -210,7 +255,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> with SingleTickerPr
               ),
 
               const SizedBox(height: 24),
-
               const Text(
                 "Recent Attendance",
                 style: TextStyle(
@@ -220,7 +264,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> with SingleTickerPr
                 ),
               ),
               const SizedBox(height: 12),
-
               ListView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -237,9 +280,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> with SingleTickerPr
                       child: Icon(Icons.calendar_today, color: Colors.white),
                     ),
                     title: Text(item['date'], style: const TextStyle(color: Colors.black)),
-                    subtitle: Text("Check-In: ${item['checkIn']} | Check-Out: ${item['checkOut']}",
+                    subtitle: Text(
+                        "Check-In: ${item['checkIn']} | Check-Out: ${item['checkOut'] ?? '--'}",
                         style: const TextStyle(color: Colors.black54)),
-                    trailing: Text(item['worked'], style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                    trailing: Text(item['worked'] ?? '--',
+                        style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
                   );
                 },
               )
