@@ -1,9 +1,29 @@
-import 'package:flutter/material.dart';
+import 'dart:io';
 
-class ProfileScreen extends StatelessWidget {
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:hrms_project/Admin_Sections/admin_login.dart';
+import 'package:intl/intl.dart';
+
+class ProfileScreen extends StatefulWidget {
   final Map<String, dynamic> employeeData;
 
   const ProfileScreen({super.key, required this.employeeData});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  late Map<String, dynamic> employeeData;
+
+  @override
+  void initState() {
+    super.initState();
+    employeeData = widget.employeeData;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -15,8 +35,10 @@ class ProfileScreen extends StatelessWidget {
     final department = employeeData['department'] ?? 'N/A';
     final email = employeeData['email'] ?? 'N/A';
     final phone = employeeData['phone'] ?? 'N/A';
-    final dob = employeeData['dob'] ?? 'N/A';
-    final joinDate = employeeData['joinDate'] ?? 'N/A';
+
+    final dob = _formatDate(employeeData['dob']);
+    final joinDate = _formatDate(employeeData['joinDate']);
+
     final workHours = employeeData['workHours'] ?? 'N/A';
     final emergencyContactName = employeeData['emergencyContactName'] ?? 'N/A';
     final emergencyContactRelation =
@@ -26,11 +48,11 @@ class ProfileScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Profile', style: TextStyle(color: Colors.white),),
-        backgroundColor: const Color(0xFF002147), // Dark blue
+        title: const Text('My Profile', style: TextStyle(color: Colors.white)),
+        backgroundColor: const Color(0xFF002147),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white,),
+            icon: const Icon(Icons.logout, color: Colors.white),
             onPressed: () => _showLogoutDialog(context),
           ),
         ],
@@ -83,9 +105,22 @@ class ProfileScreen extends StatelessWidget {
       String profileUrl, String name, String designation, String empId) {
     return Column(
       children: [
-        CircleAvatar(
-          radius: 50,
-          backgroundImage: NetworkImage(profileUrl),
+        GestureDetector(
+          onTap: _pickAndUploadImage,
+          child: Stack(
+            alignment: Alignment.bottomRight,
+            children: [
+              CircleAvatar(
+                radius: 50,
+                backgroundImage: NetworkImage(profileUrl),
+              ),
+              const CircleAvatar(
+                radius: 16,
+                backgroundColor: Colors.white,
+                child: Icon(Icons.edit, size: 18, color: Colors.blue),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 12),
         Text(
@@ -105,7 +140,8 @@ class ProfileScreen extends StatelessWidget {
           backgroundColor: Colors.yellow[100],
           label: Text(
             'ID: $empId',
-            style: TextStyle(color: Colors.blue[900], fontWeight: FontWeight.w600),
+            style: TextStyle(
+                color: Colors.blue[900], fontWeight: FontWeight.w600),
           ),
         ),
       ],
@@ -139,9 +175,60 @@ class ProfileScreen extends StatelessWidget {
     return ListTile(
       dense: true,
       leading: Icon(icon, color: Colors.blue[700]),
-      title: Text(label, style: const TextStyle(fontSize: 13, color: Colors.black54)),
-      subtitle: Text(value, style: const TextStyle(fontSize: 16, color: Colors.black)),
+      title: Text(label,
+          style: const TextStyle(fontSize: 13, color: Colors.black54)),
+      subtitle:
+      Text(value, style: const TextStyle(fontSize: 16, color: Colors.black)),
     );
+  }
+
+  String _formatDate(dynamic dateData) {
+    if (dateData == null) return 'N/A';
+    try {
+      DateTime date;
+      if (dateData is String) {
+        date = DateTime.tryParse(dateData) ?? DateTime(2000);
+      } else if (dateData is Timestamp) {
+        date = dateData.toDate();
+      } else if (dateData is DateTime) {
+        date = dateData;
+      } else {
+        return 'Invalid';
+      }
+      return DateFormat('dd MMM yyyy').format(date);
+    } catch (e) {
+      return 'Invalid Date';
+    }
+  }
+
+  Future<void> _pickAndUploadImage() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: ImageSource.gallery);
+
+    if (picked != null) {
+      final file = File(picked.path);
+      final employeeId = employeeData['employeeId'] ?? '';
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('profile_images')
+          .child('$employeeId.jpg');
+
+      await ref.putFile(file);
+      final downloadUrl = await ref.getDownloadURL();
+
+      await FirebaseFirestore.instance
+          .collection('employees')
+          .doc(employeeId)
+          .update({'profileUrl': downloadUrl});
+
+      setState(() {
+        employeeData['profileUrl'] = downloadUrl;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile image updated!')),
+      );
+    }
   }
 
   void _showLogoutDialog(BuildContext context) {
@@ -157,9 +244,11 @@ class ProfileScreen extends StatelessWidget {
           ),
           ElevatedButton(
             onPressed: () {
-              Navigator.pop(context); // Close dialog
-              Navigator.pop(context); // Navigate back or go to login
-              // Add any logout logic like clearing session/token here
+              Navigator.pop(context);
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginScreen()),
+              );
             },
             child: const Text('Logout'),
           ),

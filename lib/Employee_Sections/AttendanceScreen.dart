@@ -67,21 +67,28 @@ class _AttendanceScreenState extends State<AttendanceScreen> with SingleTickerPr
         checkInTime = data['checkIn'] != null ? DateFormat('hh:mm a').parse(data['checkIn']) : null;
         checkOutTime = data['checkOut'] != null ? DateFormat('hh:mm a').parse(data['checkOut']) : null;
         workedDuration = data['worked'] != null
-            ? Duration(
-            minutes: int.parse(data['worked'].split(' ')[0]) * 60 +
-                int.parse(data['worked'].split(' ')[2]))
+            ? Duration(minutes: int.parse(data['worked'].split(' ')[0]) * 60 + int.parse(data['worked'].split(' ')[2]))
             : null;
         isCheckedIn = checkInTime != null && checkOutTime == null;
       });
     }
   }
 
+  /// ✅ UPDATED METHOD TO FETCH LAST 5 DAYS OF ATTENDANCE
   Future<void> _fetchRecentAttendance() async {
+    final name = widget.employeeData['name'];
+    final today = DateTime.now();
+
+    // Last 5 distinct dates in same format as saved in Firestore
+    List<String> last5Dates = List.generate(5, (i) {
+      final date = today.subtract(Duration(days: i));
+      return DateFormat('dd MMM yyyy').format(date);
+    });
+
     final snapshot = await FirebaseFirestore.instance
         .collection('attendance')
-        .where('name', isEqualTo: widget.employeeData['name'])
-        .orderBy('timestamp', descending: true)
-        .limit(7)
+        .where('name', isEqualTo: name)
+        .where('date', whereIn: last5Dates)
         .get();
 
     setState(() {
@@ -97,16 +104,15 @@ class _AttendanceScreenState extends State<AttendanceScreen> with SingleTickerPr
     final today = DateFormat('dd-MM-yyyy').format(now);
     final docRef = FirebaseFirestore.instance.collection('attendance').doc('${widget.employeeData['name']}_$today');
 
-    if (!isCheckedIn && checkInTime == null) {
+    if (!isCheckedIn) {
       checkInTime = now;
       await docRef.set({
         'name': widget.employeeData['name'],
-        'date': DateFormat('dd MMM yyyy').format(now),
+        'date': DateFormat('dd MMM yyyy').format(now), // ✅ Ensure same format
         'checkIn': DateFormat('hh:mm a').format(now),
         'timestamp': FieldValue.serverTimestamp()
       });
-      isCheckedIn = true;
-    } else if (isCheckedIn && checkOutTime == null) {
+    } else {
       checkOutTime = now;
       if (checkInTime != null) {
         workedDuration = checkOutTime!.difference(checkInTime!);
@@ -114,11 +120,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> with SingleTickerPr
           'checkOut': DateFormat('hh:mm a').format(now),
           'worked': formatDuration(workedDuration)
         });
-        isCheckedIn = false;
       }
     }
 
-    setState(() {}); // Refresh UI
+    setState(() {
+      isCheckedIn = !isCheckedIn;
+    });
+
     _fetchRecentAttendance();
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -220,19 +228,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> with SingleTickerPr
                 ),
               ),
               const SizedBox(height: 24),
-
-              // Check if both Check-In and Check-Out done
-              (checkInTime != null && checkOutTime != null)
-                  ? Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Text(
-                    "You have already checked in and out today.",
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ),
-              )
-                  : ScaleTransition(
+              ScaleTransition(
                 scale: _scaleAnimation,
                 child: SlideAction(
                   key: _slideKey,
@@ -253,7 +249,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> with SingleTickerPr
                   onSubmit: _handleSlideComplete,
                 ),
               ),
-
               const SizedBox(height: 24),
               const Text(
                 "Recent Attendance",
@@ -281,10 +276,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> with SingleTickerPr
                     ),
                     title: Text(item['date'], style: const TextStyle(color: Colors.black)),
                     subtitle: Text(
-                        "Check-In: ${item['checkIn']} | Check-Out: ${item['checkOut'] ?? '--'}",
-                        style: const TextStyle(color: Colors.black54)),
-                    trailing: Text(item['worked'] ?? '--',
-                        style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                      "Check-In: ${item['checkIn']} | Check-Out: ${item['checkOut'] ?? '--'}",
+                      style: const TextStyle(color: Colors.black54),
+                    ),
+                    trailing: Text(
+                      item['worked'] ?? '--',
+                      style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                    ),
                   );
                 },
               )

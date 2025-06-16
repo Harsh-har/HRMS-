@@ -1,10 +1,10 @@
-
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart'; // ADDED
 
 class EmployeeForm extends StatefulWidget {
   @override
@@ -14,14 +14,13 @@ class EmployeeForm extends StatefulWidget {
 class _EmployeeFormState extends State<EmployeeForm> {
   final _formKey = GlobalKey<FormState>();
 
+  final TextEditingController _employeeIdController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _addressController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _salaryController = TextEditingController();
-
-  // New controllers for emergency contact
   final TextEditingController _emergencyContactNameController = TextEditingController();
   final TextEditingController _emergencyContactRelationController = TextEditingController();
   final TextEditingController _emergencyContactPhoneController = TextEditingController();
@@ -31,16 +30,13 @@ class _EmployeeFormState extends State<EmployeeForm> {
   String _selectedDesignation = 'Developer';
   String _selectedEmploymentType = 'Full-time';
   DateTime _joiningDate = DateTime.now();
-
-  // New date of birth
   DateTime _dateOfBirth = DateTime(1990, 1, 1);
 
   File? _profileImage;
   final picker = ImagePicker();
+  final DateFormat _dateFormatter = DateFormat('dd-MM-yyyy'); // ADDED
 
-  final List<String> _departments = [
-    'Development', 'Marketing', 'HR', 'Finance', 'Operations', 'Design'
-  ];
+  final List<String> _departments = ['Development', 'Marketing', 'HR', 'Finance', 'Operations', 'Design'];
 
   final Map<String, List<String>> _designations = {
     'Development': ['Developer', 'Senior Developer', 'Team Lead'],
@@ -84,37 +80,41 @@ class _EmployeeFormState extends State<EmployeeForm> {
           profileImageUrl = await _uploadImage(_profileImage!);
         }
 
+        final String employeeId = _employeeIdController.text.trim();
+        final employeeDocRef = FirebaseFirestore.instance.collection('employees').doc(employeeId);
+
         Map<String, dynamic> employeeData = {
+          'employeeId': employeeId,
           'name': _nameController.text.trim(),
           'email': _emailController.text.trim(),
           'phone': _phoneController.text.trim(),
           'address': _addressController.text.trim(),
           'department': _selectedDepartment,
           'designation': _selectedDesignation,
-          'joiningDate': _joiningDate,
+          'joiningDate': Timestamp.fromDate(_joiningDate), // UPDATED
           'employmentType': _selectedEmploymentType,
           'gender': _selectedGender,
           'salary': double.tryParse(_salaryController.text) ?? 0,
           'createdAt': FieldValue.serverTimestamp(),
           'status': 'Active',
           'profileImage': profileImageUrl ?? '',
-          'password': _passwordController.text.trim(), // storing as is; consider hashing in real apps
-          'dateOfBirth': _dateOfBirth,
-          // Emergency contact fields
+          'password': _passwordController.text.trim(),
+          'dateOfBirth': Timestamp.fromDate(_dateOfBirth), // UPDATED
           'emergencyContactName': _emergencyContactNameController.text.trim(),
           'emergencyContactRelation': _emergencyContactRelationController.text.trim(),
           'emergencyContactPhone': _emergencyContactPhoneController.text.trim(),
         };
 
-        await FirebaseFirestore.instance.collection('employees').add(employeeData);
+        await employeeDocRef.set(employeeData);
 
-        Navigator.of(context).pop(); // dismiss progress dialog
+        Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Employee added successfully!'), backgroundColor: Colors.green),
         );
 
         _formKey.currentState!.reset();
         setState(() {
+          _employeeIdController.clear();
           _joiningDate = DateTime.now();
           _dateOfBirth = DateTime(1990, 1, 1);
           _profileImage = null;
@@ -132,6 +132,7 @@ class _EmployeeFormState extends State<EmployeeForm> {
     }
   }
 
+  // ===== VALIDATORS =====
   String? _validateEmail(String? value) {
     if (value == null || value.isEmpty) return 'Enter Email';
     final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
@@ -162,6 +163,12 @@ class _EmployeeFormState extends State<EmployeeForm> {
     return null;
   }
 
+  String? _validateEmployeeId(String? value) {
+    if (value == null || value.isEmpty) return 'Enter Employee ID';
+    return null;
+  }
+
+  // ===== WIDGET BUILDERS =====
   Widget _buildTextField(TextEditingController controller, String label, IconData icon,
       {bool isPassword = false, TextInputType keyboardType = TextInputType.text, String? Function(String?)? validator}) {
     return Padding(
@@ -220,7 +227,7 @@ class _EmployeeFormState extends State<EmployeeForm> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("${selectedDate.toLocal()}".split(' ')[0], style: const TextStyle(fontSize: 16)),
+              Text(_dateFormatter.format(selectedDate), style: const TextStyle(fontSize: 16)),
               const Icon(Icons.edit_calendar),
             ],
           ),
@@ -255,20 +262,15 @@ class _EmployeeFormState extends State<EmployeeForm> {
               _buildTextField(_nameController, 'Full Name', Icons.person),
               _buildTextField(_emailController, 'Email', Icons.email, keyboardType: TextInputType.emailAddress, validator: _validateEmail),
               _buildTextField(_phoneController, 'Phone', Icons.phone, keyboardType: TextInputType.phone, validator: _validatePhone),
+              _buildTextField(_employeeIdController, 'Employee ID', Icons.badge, validator: _validateEmployeeId),
               _buildTextField(_addressController, 'Address', Icons.home),
-              _buildDropdown(_selectedGender, 'Gender', Icons.person_outline, ['Male', 'Female', 'Other'],
-                      (value) => setState(() => _selectedGender = value)),
-              _buildDropdown(_selectedDepartment, 'Department', Icons.business, _departments,
-                      (value) => setState(() {
-                    _selectedDepartment = value;
-                    _selectedDesignation = _designations[value]!.first;
-                  })),
-              _buildDropdown(_selectedDesignation, 'Designation', Icons.work,
-                  _designations[_selectedDepartment]!,
-                      (value) => setState(() => _selectedDesignation = value)),
-              _buildDropdown(_selectedEmploymentType, 'Employment Type', Icons.access_time,
-                  ['Full-time', 'Part-time', 'Internship', 'Contract'],
-                      (value) => setState(() => _selectedEmploymentType = value)),
+              _buildDropdown(_selectedGender, 'Gender', Icons.person_outline, ['Male', 'Female', 'Other'], (value) => setState(() => _selectedGender = value)),
+              _buildDropdown(_selectedDepartment, 'Department', Icons.business, _departments, (value) => setState(() {
+                _selectedDepartment = value;
+                _selectedDesignation = _designations[value]!.first;
+              })),
+              _buildDropdown(_selectedDesignation, 'Designation', Icons.work, _designations[_selectedDepartment]!, (value) => setState(() => _selectedDesignation = value)),
+              _buildDropdown(_selectedEmploymentType, 'Employment Type', Icons.access_time, ['Full-time', 'Part-time', 'Internship', 'Contract'], (value) => setState(() => _selectedEmploymentType = value)),
               _buildDatePicker(label: 'Joining Date', selectedDate: _joiningDate, onDateSelected: (date) => setState(() => _joiningDate = date)),
               _buildDatePicker(label: 'Date of Birth', selectedDate: _dateOfBirth, onDateSelected: (date) => setState(() => _dateOfBirth = date)),
               _buildTextField(_salaryController, 'Monthly Salary', Icons.money, keyboardType: TextInputType.number, validator: _validateSalary),
@@ -283,9 +285,7 @@ class _EmployeeFormState extends State<EmployeeForm> {
               Center(
                 child: ElevatedButton(
                   onPressed: _submitForm,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
-                  ),
+                  style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14)),
                   child: const Text('Submit'),
                 ),
               )
