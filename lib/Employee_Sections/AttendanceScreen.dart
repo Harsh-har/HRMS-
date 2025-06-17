@@ -1,6 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:slide_to_act/slide_to_act.dart';
 
@@ -12,38 +12,26 @@ class AttendanceScreen extends StatefulWidget {
   State<AttendanceScreen> createState() => _AttendanceScreenState();
 }
 
-class _AttendanceScreenState extends State<AttendanceScreen> with SingleTickerProviderStateMixin {
+class _AttendanceScreenState extends State<AttendanceScreen>
+    with SingleTickerProviderStateMixin {
   late Timer _timer;
   late String _timeString;
   late String _dateString;
-  late AnimationController _animationController;
-  late Animation<double> _scaleAnimation;
-
   bool isCheckedIn = false;
   DateTime? checkInTime;
   DateTime? checkOutTime;
-  Duration? workedDuration;
+  double? workedHoursDecimal;
+  double weeklyWorkedHoursDecimal = 0.0;
 
   final GlobalKey<SlideActionState> _slideKey = GlobalKey();
-  List<Map<String, dynamic>> recentAttendance = [];
 
   @override
   void initState() {
     super.initState();
     _updateTime();
-    _timer = Timer.periodic(const Duration(seconds: 1), (Timer t) => _updateTime());
-
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-    );
-
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.1).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
-
+    _timer = Timer.periodic(Duration(seconds: 1), (timer) => _updateTime());
     _fetchTodayAttendance();
-    _fetchRecentAttendance();
+    _fetchWeeklyWorkedHours();
   }
 
   void _updateTime() {
@@ -64,230 +52,211 @@ class _AttendanceScreenState extends State<AttendanceScreen> with SingleTickerPr
     if (doc.exists) {
       final data = doc.data()!;
       setState(() {
-        checkInTime = data['checkIn'] != null ? DateFormat('hh:mm a').parse(data['checkIn']) : null;
-        checkOutTime = data['checkOut'] != null ? DateFormat('hh:mm a').parse(data['checkOut']) : null;
-        workedDuration = data['worked'] != null
-            ? Duration(minutes: int.parse(data['worked'].split(' ')[0]) * 60 + int.parse(data['worked'].split(' ')[2]))
+        checkInTime = data['checkIn'] != null
+            ? DateFormat('hh:mm a').parse(data['checkIn'])
+            : null;
+        checkOutTime = data['checkOut'] != null
+            ? DateFormat('hh:mm a').parse(data['checkOut'])
+            : null;
+        workedHoursDecimal = data['workedHours'] != null
+            ? double.tryParse(data['workedHours'].toString())
             : null;
         isCheckedIn = checkInTime != null && checkOutTime == null;
       });
     }
   }
 
-  /// ✅ UPDATED METHOD TO FETCH LAST 5 DAYS OF ATTENDANCE
-  Future<void> _fetchRecentAttendance() async {
+  Future<void> _fetchWeeklyWorkedHours() async {
     final name = widget.employeeData['name'];
-    final today = DateTime.now();
+    final now = DateTime.now();
+    final monday = now.subtract(Duration(days: now.weekday - 1));
 
-    // Last 5 distinct dates in same format as saved in Firestore
-    List<String> last5Dates = List.generate(5, (i) {
-      final date = today.subtract(Duration(days: i));
-      return DateFormat('dd MMM yyyy').format(date);
-    });
+    List<String> weekDates = List.generate(
+        now.difference(monday).inDays + 1,
+            (i) => DateFormat('dd-MM-yyyy').format(monday.add(Duration(days: i))));
 
     final snapshot = await FirebaseFirestore.instance
         .collection('attendance')
         .where('name', isEqualTo: name)
-        .where('date', whereIn: last5Dates)
         .get();
 
-    setState(() {
-      recentAttendance = snapshot.docs.map((doc) => doc.data()).toList();
-    });
-  }
+    double total = 0.0;
 
-  Future<void> _handleSlideComplete() async {
-    await _animationController.forward();
-    await _animationController.reverse();
-
-    final now = DateTime.now();
-    final today = DateFormat('dd-MM-yyyy').format(now);
-    final docRef = FirebaseFirestore.instance.collection('attendance').doc('${widget.employeeData['name']}_$today');
-
-    if (!isCheckedIn) {
-      checkInTime = now;
-      await docRef.set({
-        'name': widget.employeeData['name'],
-        'date': DateFormat('dd MMM yyyy').format(now), // ✅ Ensure same format
-        'checkIn': DateFormat('hh:mm a').format(now),
-        'timestamp': FieldValue.serverTimestamp()
-      });
-    } else {
-      checkOutTime = now;
-      if (checkInTime != null) {
-        workedDuration = checkOutTime!.difference(checkInTime!);
-        await docRef.update({
-          'checkOut': DateFormat('hh:mm a').format(now),
-          'worked': formatDuration(workedDuration)
-        });
+    for (var doc in snapshot.docs) {
+      final data = doc.data();
+      if (data['date'] != null &&
+          weekDates.contains(data['date']) &&
+          data['workedHours'] != null) {
+        total += double.tryParse(data['workedHours'].toString()) ?? 0.0;
       }
     }
 
     setState(() {
-      isCheckedIn = !isCheckedIn;
+      weeklyWorkedHoursDecimal = total;
     });
-
-    _fetchRecentAttendance();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(isCheckedIn ? "Checked In Successfully!" : "Checked Out Successfully!"),
-        backgroundColor: isCheckedIn ? Colors.green : Colors.red,
-      ),
-    );
-
-    _slideKey.currentState?.reset();
   }
 
-  String formatDuration(Duration? duration) {
-    if (duration == null) return '--';
-    final hours = duration.inHours;
-    final minutes = duration.inMinutes.remainder(60);
-    return '$hours hr ${minutes.toString().padLeft(2, '0')} min';
+  Future<void> _handleSlideComplete() async {
+    final now = DateTime.now();
+    final todayFormatted = DateFormat('dd-MM-yyyy').format(now);
+    final docRef = FirebaseFirestore.instance
+        .collection('attendance')
+        .doc('${widget.employeeData['name']}_$todayFormatted');
+    final snapshot = await docRef.get();
+
+    if (!snapshot.exists) {
+      checkInTime = now;
+      await docRef.set({
+        'name': widget.employeeData['name'],
+        'date': todayFormatted,
+        'checkIn': DateFormat('hh:mm a').format(now),
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      setState(() {
+        isCheckedIn = true;
+        checkOutTime = null;
+        workedHoursDecimal = null;
+      });
+    } else {
+      final data = snapshot.data()!;
+      if (data.containsKey('checkIn') && !data.containsKey('checkOut')) {
+        checkInTime = DateFormat('hh:mm a').parse(data['checkIn']);
+        checkOutTime = now;
+        Duration worked = checkOutTime!.difference(checkInTime!);
+        double hours = worked.inMinutes / 60;
+        String formattedHours = hours.toStringAsFixed(2);
+
+        await docRef.update({
+          'checkOut': DateFormat('hh:mm a').format(now),
+          'workedHours': formattedHours,
+        });
+
+        setState(() {
+          isCheckedIn = false;
+          workedHoursDecimal = double.tryParse(formattedHours);
+        });
+
+        await _fetchWeeklyWorkedHours();
+      }
+    }
+
+    _slideKey.currentState?.reset();
+    _fetchTodayAttendance();
+  }
+
+  String displayWorkedHours(double? hours) {
+    if (hours == null) return '--';
+    int hr = hours.floor();
+    int min = ((hours - hr) * 60).round();
+    return '$hr hr ${min.toString().padLeft(2, '0')} min';
   }
 
   @override
   void dispose() {
     _timer.cancel();
-    _animationController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Scaffold(
-        backgroundColor: Colors.white,
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                "Attendance",
-                style: TextStyle(
-                  color: Colors.black,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                "$_dateString | $_timeString",
+    double weeklyProgress = weeklyWorkedHoursDecimal / 45;
+    weeklyProgress = weeklyProgress.clamp(0, 1);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Attendance Tracker"),
+        backgroundColor: Colors.blue[900],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text("Welcome, ${widget.employeeData['name']}",
                 style: const TextStyle(
-                  color: Colors.black54,
-                  fontSize: 16,
+                    fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
+            Text("$_dateString | $_timeString",
+                style: const TextStyle(fontSize: 16, color: Colors.black54)),
+            const SizedBox(height: 20),
+            Card(
+              color: Colors.grey[100],
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("Today's Summary",
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        Column(
+                          children: [
+                            const Text("Check In"),
+                            Text(checkInTime != null
+                                ? DateFormat('hh:mm a').format(checkInTime!)
+                                : '--'),
+                          ],
+                        ),
+                        Column(
+                          children: [
+                            const Text("Check Out"),
+                            Text(checkOutTime != null
+                                ? DateFormat('hh:mm a').format(checkOutTime!)
+                                : '--'),
+                          ],
+                        ),
+                        Column(
+                          children: [
+                            const Text("Worked"),
+                            Text(displayWorkedHours(workedHoursDecimal)),
+                          ],
+                        ),
+                      ],
+                    )
+                  ],
                 ),
               ),
-              const SizedBox(height: 24),
-              Card(
-                color: Colors.grey[100],
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                elevation: 2,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text("Today’s Summary",
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            children: [
-                              const Icon(Icons.login, color: Colors.green),
-                              const SizedBox(height: 4),
-                              Text("Check-In\n${checkInTime != null ? DateFormat('hh:mm a').format(checkInTime!) : '--'}",
-                                  textAlign: TextAlign.center),
-                            ],
-                          ),
-                          Column(
-                            children: [
-                              const Icon(Icons.logout, color: Colors.redAccent),
-                              const SizedBox(height: 4),
-                              Text("Check-Out\n${checkOutTime != null ? DateFormat('hh:mm a').format(checkOutTime!) : '--'}",
-                                  textAlign: TextAlign.center),
-                            ],
-                          ),
-                          Column(
-                            children: [
-                              const Icon(Icons.access_time_filled, color: Colors.orange),
-                              const SizedBox(height: 4),
-                              Text("Worked\n${formatDuration(workedDuration)}",
-                                  textAlign: TextAlign.center),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
+            ),
+            const SizedBox(height: 20),
+            LinearProgressIndicator(
+              value: weeklyProgress,
+              backgroundColor: Colors.grey[300],
+              color: Colors.blue,
+              minHeight: 10,
+            ),
+            const SizedBox(height: 8),
+            Text(
+                "Weekly Hours: ${displayWorkedHours(weeklyWorkedHoursDecimal)} / 45 hr",
+                style: const TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 24),
+            SlideAction(
+              key: _slideKey,
+              borderRadius: 30,
+              elevation: 4,
+              innerColor: isCheckedIn ? Colors.red : Colors.green,
+              outerColor:
+              isCheckedIn ? Colors.red.shade100 : Colors.green.shade100,
+              sliderButtonIcon: Icon(
+                isCheckedIn ? Icons.logout : Icons.login,
+                color: isCheckedIn ? Colors.red : Colors.green,
               ),
-              const SizedBox(height: 24),
-              ScaleTransition(
-                scale: _scaleAnimation,
-                child: SlideAction(
-                  key: _slideKey,
-                  borderRadius: 30,
-                  elevation: 4,
-                  innerColor: isCheckedIn ? Colors.red : Colors.green,
-                  outerColor: isCheckedIn ? Colors.red.shade100 : Colors.green.shade100,
-                  sliderButtonIcon: Icon(
-                    isCheckedIn ? Icons.logout : Icons.login,
-                    color: isCheckedIn ? Colors.red : Colors.green,
-                  ),
-                  text: isCheckedIn ? 'Slide to Check-Out' : 'Slide to Check-In',
-                  textStyle: const TextStyle(
-                    color: Colors.black,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  onSubmit: _handleSlideComplete,
-                ),
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                "Recent Attendance",
-                style: TextStyle(
+              text: isCheckedIn ? 'Slide to Check-Out' : 'Slide to Check-In',
+              textStyle: const TextStyle(
                   color: Colors.black,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 12),
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: recentAttendance.length,
-                itemBuilder: (context, index) {
-                  final item = recentAttendance[index];
-                  return ListTile(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    tileColor: Colors.grey[100],
-                    leading: const CircleAvatar(
-                      backgroundColor: Colors.blueGrey,
-                      child: Icon(Icons.calendar_today, color: Colors.white),
-                    ),
-                    title: Text(item['date'], style: const TextStyle(color: Colors.black)),
-                    subtitle: Text(
-                      "Check-In: ${item['checkIn']} | Check-Out: ${item['checkOut'] ?? '--'}",
-                      style: const TextStyle(color: Colors.black54),
-                    ),
-                    trailing: Text(
-                      item['worked'] ?? '--',
-                      style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
-                    ),
-                  );
-                },
-              )
-            ],
-          ),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600),
+              onSubmit: _handleSlideComplete,
+            ),
+          ],
         ),
       ),
     );
