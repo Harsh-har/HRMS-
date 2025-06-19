@@ -5,7 +5,7 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.7.0
+  sdk: '>=3.2.0 <4.0.0' # Adjusted SDK range for compatibility
 
 dependencies:
   flutter:
@@ -15,21 +15,21 @@ dependencies:
   flutter_rating_bar: ^4.0.1
   table_calendar: ^3.0.9
   sqflite: ^2.3.0
-  firebase_core: ^2.24.2
-  firebase_auth: ^4.16.0
-  cloud_firestore: ^4.13.1
-  firebase_storage_web: 3.6.22
-  firebase_storage: ^11.5.0
-  slide_to_act: ^2.0.0
-  shared_preferences: ^2.5.3
-  intl: ^0.20.2
-  pdf: ^3.11.3
-  printing: ^5.14.2
+  firebase_core: ^3.6.0 # Updated to latest stable version
+  firebase_auth: ^5.3.1 # Updated to latest stable version
+  cloud_firestore: ^5.4.4 # Updated to latest stable version
+  firebase_storage: ^12.3.2 # Updated to latest stable version
+  firebase_storage_web: ^3.9.1 # Updated to latest stable version
+  slide_to_act: ^2.0.2
+  shared_preferences: ^2.3.2
+  intl: ^0.19.0 # Downgraded to stable version compatible with SDK
+  pdf: ^3.11.0
+  printing: ^5.13.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^2.0.3
+  flutter_lints: ^4.0.0 # Updated to latest stable version
 
 flutter:
   uses-material-design: true

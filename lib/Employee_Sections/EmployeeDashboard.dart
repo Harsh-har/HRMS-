@@ -44,7 +44,7 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
     Widget? destination;
     switch (index) {
       case 1:
-        destination = AttendanceScreen(employeeData: widget.employeeData);
+        destination =  NewAttendanceScreen(employeeData: widget.employeeData);
         break;
       case 2:
         destination = UserProjectScreen(employeeData: widget.employeeData);

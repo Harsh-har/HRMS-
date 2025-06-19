@@ -4,15 +4,15 @@ import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:slide_to_act/slide_to_act.dart';
 
-class AttendanceScreen extends StatefulWidget {
+class NewAttendanceScreen extends StatefulWidget {
   final Map<String, dynamic> employeeData;
-  const AttendanceScreen({super.key, required this.employeeData});
+  const NewAttendanceScreen({super.key, required this.employeeData});
 
   @override
-  State<AttendanceScreen> createState() => _AttendanceScreenState();
+  State<NewAttendanceScreen> createState() => _NewAttendanceScreenState();
 }
 
-class _AttendanceScreenState extends State<AttendanceScreen>
+class _NewAttendanceScreenState extends State<NewAttendanceScreen>
     with SingleTickerProviderStateMixin {
   late Timer _timer;
   late String _timeString;
@@ -20,18 +20,30 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   bool isCheckedIn = false;
   DateTime? checkInTime;
   DateTime? checkOutTime;
-  double? workedHoursDecimal;
-  double weeklyWorkedHoursDecimal = 0.0;
+  List<Map<String, dynamic>> lastFiveRecords = [];
+  double totalWorkedHours = 0.0;
 
   final GlobalKey<SlideActionState> _slideKey = GlobalKey();
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
     _updateTime();
-    _timer = Timer.periodic(Duration(seconds: 1), (timer) => _updateTime());
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) => _updateTime());
     _fetchTodayAttendance();
-    _fetchWeeklyWorkedHours();
+    _fetchLastFiveRecords();
+    _fetchTotalWorkedHours();
+
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+    _animationController.forward();
   }
 
   void _updateTime() {
@@ -42,11 +54,18 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     });
   }
 
+  String _getDayName(DateTime date) {
+    return DateFormat('EEEE').format(date);
+  }
+
   Future<void> _fetchTodayAttendance() async {
-    final today = DateFormat('dd-MM-yyyy').format(DateTime.now());
+    final today = DateTime.now();
+    final dayName = _getDayName(today);
     final doc = await FirebaseFirestore.instance
         .collection('attendance')
-        .doc('${widget.employeeData['name']}_$today')
+        .doc(widget.employeeData['name'])
+        .collection(dayName)
+        .doc('record')
         .get();
 
     if (doc.exists) {
@@ -58,207 +77,404 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         checkOutTime = data['checkOut'] != null
             ? DateFormat('hh:mm a').parse(data['checkOut'])
             : null;
-        workedHoursDecimal = data['workedHours'] != null
-            ? double.tryParse(data['workedHours'].toString())
-            : null;
         isCheckedIn = checkInTime != null && checkOutTime == null;
       });
     }
   }
 
-  Future<void> _fetchWeeklyWorkedHours() async {
+  Future<void> _fetchLastFiveRecords() async {
     final name = widget.employeeData['name'];
-    final now = DateTime.now();
-    final monday = now.subtract(Duration(days: now.weekday - 1));
+    final days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    List<Map<String, dynamic>> records = [];
 
-    List<String> weekDates = List.generate(
-        now.difference(monday).inDays + 1,
-            (i) => DateFormat('dd-MM-yyyy').format(monday.add(Duration(days: i))));
+    for (var day in days) {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('attendance')
+          .doc(name)
+          .collection(day)
+          .doc('record')
+          .get();
 
-    final snapshot = await FirebaseFirestore.instance
-        .collection('attendance')
-        .where('name', isEqualTo: name)
-        .get();
+      if (snapshot.exists) {
+        final data = snapshot.data()!;
+        records.add({
+          'date': data['date'] ?? '--',
+          'checkIn': data['checkIn'] ?? '--',
+          'checkOut': data['checkOut'] ?? '--',
+        });
+      }
+    }
 
+    // Sort records by date in descending order
+    records.sort((a, b) {
+      try {
+        final dateA = DateFormat('dd MMM yyyy').parse(a['date']);
+        final dateB = DateFormat('dd MMM yyyy').parse(b['date']);
+        return dateB.compareTo(dateA);
+      } catch (e) {
+        return 0;
+      }
+    });
+
+    setState(() {
+      lastFiveRecords = records.take(5).toList();
+    });
+  }
+
+  Future<void> _fetchTotalWorkedHours() async {
+    final name = widget.employeeData['name'];
+    final days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     double total = 0.0;
 
-    for (var doc in snapshot.docs) {
-      final data = doc.data();
-      if (data['date'] != null &&
-          weekDates.contains(data['date']) &&
-          data['workedHours'] != null) {
-        total += double.tryParse(data['workedHours'].toString()) ?? 0.0;
+    for (var day in days) {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('attendance')
+          .doc(name)
+          .collection(day)
+          .doc('record')
+          .get();
+
+      if (snapshot.exists) {
+        final data = snapshot.data()!;
+        if (data['checkIn'] != null && data['checkOut'] != null && data['date'] != null) {
+          try {
+            final date = DateFormat('dd MMM yyyy').parse(data['date']);
+            final checkInTime = DateFormat('hh:mm a').parse(data['checkIn']);
+            final checkOutTime = DateFormat('hh:mm a').parse(data['checkOut']);
+            // Combine date with time
+            final checkIn = DateTime(
+              date.year,
+              date.month,
+              date.day,
+              checkInTime.hour,
+              checkInTime.minute,
+            );
+            final checkOut = DateTime(
+              date.year,
+              date.month,
+              date.day,
+              checkOutTime.hour,
+              checkOutTime.minute,
+            );
+            final worked = checkOut.difference(checkIn);
+            total += worked.inMinutes / 60.0;
+          } catch (e) {
+            // Skip invalid records
+            continue;
+          }
+        }
       }
     }
 
     setState(() {
-      weeklyWorkedHoursDecimal = total;
+      totalWorkedHours = total;
     });
   }
 
   Future<void> _handleSlideComplete() async {
     final now = DateTime.now();
-    final todayFormatted = DateFormat('dd-MM-yyyy').format(now);
+    final dayName = _getDayName(now);
+    final dateFormatted = DateFormat('dd MMM yyyy').format(now);
     final docRef = FirebaseFirestore.instance
         .collection('attendance')
-        .doc('${widget.employeeData['name']}_$todayFormatted');
+        .doc(widget.employeeData['name'])
+        .collection(dayName)
+        .doc('record');
     final snapshot = await docRef.get();
+
+    if (snapshot.exists) {
+      final data = snapshot.data()!;
+      if (data.containsKey('checkIn') && data.containsKey('checkOut')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Already checked in and out today!'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 2),
+          ),
+        );
+        _slideKey.currentState?.reset();
+        return;
+      }
+    }
 
     if (!snapshot.exists) {
       checkInTime = now;
       await docRef.set({
-        'name': widget.employeeData['name'],
-        'date': todayFormatted,
         'checkIn': DateFormat('hh:mm a').format(now),
+        'date': dateFormatted,
         'timestamp': FieldValue.serverTimestamp(),
       });
 
       setState(() {
         isCheckedIn = true;
         checkOutTime = null;
-        workedHoursDecimal = null;
       });
     } else {
       final data = snapshot.data()!;
       if (data.containsKey('checkIn') && !data.containsKey('checkOut')) {
-        checkInTime = DateFormat('hh:mm a').parse(data['checkIn']);
+        final date = DateFormat('dd MMM yyyy').parse(data['date']);
+        final checkInTime = DateFormat('hh:mm a').parse(data['checkIn']);
+        final checkIn = DateTime(
+          date.year,
+          date.month,
+          date.day,
+          checkInTime.hour,
+          checkInTime.minute,
+        );
         checkOutTime = now;
-        Duration worked = checkOutTime!.difference(checkInTime!);
-        double hours = worked.inMinutes / 60;
-        String formattedHours = hours.toStringAsFixed(2);
+        final checkOut = DateTime(
+          date.year,
+          date.month,
+          date.day,
+          now.hour,
+          now.minute,
+        );
+        final worked = checkOut.difference(checkIn);
+        final hours = worked.inMinutes / 60.0;
+        final hr = hours.floor();
+        final min = ((hours - hr) * 60).round();
 
         await docRef.update({
           'checkOut': DateFormat('hh:mm a').format(now),
-          'workedHours': formattedHours,
+          'totalWorkedHours': '$hr hr ${min.toString().padLeft(2, '0')} min',
         });
 
         setState(() {
           isCheckedIn = false;
-          workedHoursDecimal = double.tryParse(formattedHours);
         });
-
-        await _fetchWeeklyWorkedHours();
       }
     }
 
     _slideKey.currentState?.reset();
-    _fetchTodayAttendance();
+    await _fetchTodayAttendance();
+    await _fetchLastFiveRecords();
+    await _fetchTotalWorkedHours();
+
+    _animationController.reset();
+    _animationController.forward();
   }
 
-  String displayWorkedHours(double? hours) {
-    if (hours == null) return '--';
-    int hr = hours.floor();
-    int min = ((hours - hr) * 60).round();
+  String _formatTotalWorkedHours(double hours) {
+    final hr = hours.floor();
+    final min = ((hours - hr) * 60).round();
     return '$hr hr ${min.toString().padLeft(2, '0')} min';
   }
 
   @override
   void dispose() {
     _timer.cancel();
+    _animationController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    double weeklyProgress = weeklyWorkedHoursDecimal / 45;
-    weeklyProgress = weeklyProgress.clamp(0, 1);
-
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text("Attendance Tracker"),
-        backgroundColor: Colors.blue[900],
+        title: const Text("Attendance Dashboard"),
+        backgroundColor: Colors.indigo[700],
+        elevation: 0,
+        centerTitle: true,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Text("Welcome, ${widget.employeeData['name']}",
-                style: const TextStyle(
-                    fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            Text("$_dateString | $_timeString",
-                style: const TextStyle(fontSize: 16, color: Colors.black54)),
-            const SizedBox(height: 20),
-            Card(
-              color: Colors.grey[100],
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
-              elevation: 2,
-              child: Padding(
+      body: FadeTransition(
+        opacity: _fadeAnimation,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
                 padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.indigo[50],
+                  borderRadius: BorderRadius.circular(16),
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text("Today's Summary",
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 10),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        Column(
-                          children: [
-                            const Text("Check In"),
-                            Text(checkInTime != null
-                                ? DateFormat('hh:mm a').format(checkInTime!)
-                                : '--'),
-                          ],
-                        ),
-                        Column(
-                          children: [
-                            const Text("Check Out"),
-                            Text(checkOutTime != null
-                                ? DateFormat('hh:mm a').format(checkOutTime!)
-                                : '--'),
-                          ],
-                        ),
-                        Column(
-                          children: [
-                            const Text("Worked"),
-                            Text(displayWorkedHours(workedHoursDecimal)),
-                          ],
-                        ),
-                      ],
-                    )
+                    Text(
+                      "Hello, ${widget.employeeData['name']}",
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.indigo[900],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      "$_dateString | $_timeString",
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.indigo[400],
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
-            LinearProgressIndicator(
-              value: weeklyProgress,
-              backgroundColor: Colors.grey[300],
-              color: Colors.blue,
-              minHeight: 10,
-            ),
-            const SizedBox(height: 8),
-            Text(
-                "Weekly Hours: ${displayWorkedHours(weeklyWorkedHoursDecimal)} / 45 hr",
-                style: const TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 24),
-            SlideAction(
-              key: _slideKey,
-              borderRadius: 30,
-              elevation: 4,
-              innerColor: isCheckedIn ? Colors.red : Colors.green,
-              outerColor:
-              isCheckedIn ? Colors.red.shade100 : Colors.green.shade100,
-              sliderButtonIcon: Icon(
-                isCheckedIn ? Icons.logout : Icons.login,
-                color: isCheckedIn ? Colors.red : Colors.green,
+              const SizedBox(height: 16),
+              Card(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 4,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Today's Activity",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.indigo[800],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _buildInfoColumn(
+                            "Check In",
+                            checkInTime != null
+                                ? DateFormat('hh:mm a').format(checkInTime!)
+                                : '--',
+                          ),
+                          _buildInfoColumn(
+                            "Check Out",
+                            checkOutTime != null
+                                ? DateFormat('hh:mm a').format(checkOutTime!)
+                                : '--',
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              text: isCheckedIn ? 'Slide to Check-Out' : 'Slide to Check-In',
-              textStyle: const TextStyle(
-                  color: Colors.black,
+              const SizedBox(height: 24),
+              SlideAction(
+                key: _slideKey,
+                borderRadius: 30,
+                elevation: 6,
+                innerColor: isCheckedIn ? Colors.red[600] : Colors.green[600],
+                outerColor: isCheckedIn ? Colors.red[100] : Colors.green[100],
+                sliderButtonIcon: Icon(
+                  isCheckedIn ? Icons.logout : Icons.login,
+                  color: Colors.white,
+                ),
+                text: isCheckedIn ? 'Slide to Check Out' : 'Slide to Check In',
+                textStyle: const TextStyle(
+                  color: Colors.black87,
                   fontSize: 16,
-                  fontWeight: FontWeight.w600),
-              onSubmit: _handleSlideComplete,
-            ),
-          ],
+                  fontWeight: FontWeight.w600,
+                ),
+                onSubmit: _handleSlideComplete,
+              ),
+              const SizedBox(height: 24),
+              Card(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 4,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Attendance Summary",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.indigo[800],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        "Total Worked: ${_formatTotalWorkedHours(totalWorkedHours)}",
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.indigo[600],
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        "Last 5 Attendance Records",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.indigo[800],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      lastFiveRecords.isEmpty
+                          ? const Center(
+                        child: Text(
+                          "No records found",
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      )
+                          : ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: lastFiveRecords.length,
+                        separatorBuilder: (context, index) =>
+                        const Divider(),
+                        itemBuilder: (context, index) {
+                          final record = lastFiveRecords[index];
+                          return ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(
+                              "Date: ${record['date']}",
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment:
+                              CrossAxisAlignment.start,
+                              children: [
+                                Text("Check In: ${record['checkIn']}"),
+                                Text("Check Out: ${record['checkOut']}"),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _buildInfoColumn(String title, String value) {
+    return Column(
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.indigo[600],
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
     );
   }
 }
