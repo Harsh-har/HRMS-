@@ -3,54 +3,119 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class UserTimesheetScreen extends StatefulWidget {
+  final Map<String, dynamic> employeeData;
+  const UserTimesheetScreen({super.key, required this.employeeData});
+
   @override
   _UserTimesheetScreenState createState() => _UserTimesheetScreenState();
 }
 
 class _UserTimesheetScreenState extends State<UserTimesheetScreen> {
   String selectedFilter = 'This Week';
+  List<Map<String, String>> timesheet = [];
 
-  List<Map<String, String>> fullTimesheet = [
-    {
-      'date': '10 June 2025',
-      'checkIn': '09:05 AM',
-      'checkOut': '06:00 PM',
-      'status': 'Late',
-    },
-    {
-      'date': '11 June 2025',
-      'checkIn': '09:00 AM',
-      'checkOut': '06:00 PM',
-      'status': 'Present',
-    },
-    {
-      'date': '12 June 2025',
-      'checkIn': '-',
-      'checkOut': '-',
-      'status': 'Absent',
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _fetchTimesheet();
+  }
+
+  Future<void> _fetchTimesheet() async {
+    final name = widget.employeeData['name'];
+    final days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    List<Map<String, String>> records = [];
+    final now = DateTime.now();
+    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+    final startOfMonth = DateTime(now.year, now.month, 1);
+    final endOfMonth = DateTime(now.year, now.month + 1, 0);
+
+    for (var day in days) {
+      final snapshots = await FirebaseFirestore.instance
+          .collection('attendance')
+          .doc(name)
+          .collection(day)
+          .get();
+
+      for (var doc in snapshots.docs) {
+        final data = doc.data();
+        final dateStr = data['date'];
+        if (dateStr == null) continue;
+
+        try {
+          final recordDate = DateFormat('dd MMM yyyy').parse(dateStr);
+          bool includeRecord = false;
+
+          if (selectedFilter == 'This Week') {
+            includeRecord = recordDate.isAfter(startOfWeek.subtract(Duration(days: 1))) &&
+                recordDate.isBefore(startOfWeek.add(Duration(days: 7)));
+          } else if (selectedFilter == 'This Month') {
+            includeRecord = recordDate.isAfter(startOfMonth.subtract(Duration(days: 1))) &&
+                recordDate.isBefore(endOfMonth.add(Duration(days: 1)));
+          }
+
+          if (includeRecord) {
+            String status = 'Absent';
+            if (data['checkIn'] != null && data['checkOut'] != null) {
+              final checkInTime = DateFormat('hh:mm a').parse(data['checkIn']);
+              status = checkInTime.hour > 9 || (checkInTime.hour == 9 && checkInTime.minute > 0)
+                  ? 'Late'
+                  : 'Present';
+            }
+
+            records.add({
+              'date': data['date'] ?? '--',
+              'checkIn': data['checkIn'] ?? '-',
+              'checkOut': data['checkOut'] ?? '-',
+              'status': status,
+              'totalWorkedHours': data['totalWorkedHours'] ??
+                  calculateWorkedHours(data['checkIn'] ?? '-', data['checkOut'] ?? '-'),
+            });
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+    }
+
+    // Sort by date descending
+    records.sort((a, b) {
+      try {
+        final dateA = DateFormat('dd MMM yyyy').parse(a['date']!);
+        final dateB = DateFormat('dd MMM yyyy').parse(b['date']!);
+        return dateB.compareTo(dateA);
+      } catch (e) {
+        return 0;
+      }
+    });
+
+    setState(() {
+      timesheet = records;
+    });
+  }
 
   String calculateWorkedHours(String checkIn, String checkOut) {
-    if (checkIn == '-' || checkOut == '-') return '0h';
+    if (checkIn == '-' || checkOut == '-') return '0h 0m';
     try {
       final format = DateFormat('hh:mm a');
       final inTime = format.parse(checkIn);
       final outTime = format.parse(checkOut);
-      final duration = outTime.difference(inTime);
+      final checkInTime = DateTime(2025, 6, 19, inTime.hour, inTime.minute);
+      final checkOutTime = DateTime(2025, 6, 19, outTime.hour, outTime.minute);
+      final duration = checkOutTime.difference(checkInTime);
       final hours = duration.inHours;
       final minutes = duration.inMinutes.remainder(60);
-      return '${hours}h ${minutes}m';
+      return '${hours}h ${minutes.abs()}m';
     } catch (e) {
-      return '0h';
+      return '0h 0m';
     }
   }
 
   String getTotalHours() {
     Duration total = Duration();
-    for (var entry in fullTimesheet) {
+    for (var entry in timesheet) {
       final checkIn = entry['checkIn']!;
       final checkOut = entry['checkOut']!;
       if (checkIn != '-' && checkOut != '-') {
@@ -58,21 +123,23 @@ class _UserTimesheetScreenState extends State<UserTimesheetScreen> {
           final format = DateFormat('hh:mm a');
           final inTime = format.parse(checkIn);
           final outTime = format.parse(checkOut);
-          total += outTime.difference(inTime);
+          final checkInTime = DateTime(2025, 6, 19, inTime.hour, inTime.minute);
+          final checkOutTime = DateTime(2025, 6, 19, outTime.hour, outTime.minute);
+          total += checkOutTime.difference(checkInTime);
         } catch (e) {}
       }
     }
     final h = total.inHours;
     final m = total.inMinutes.remainder(60);
-    return '${h}h ${m}m';
+    return '${h}h ${m.abs()}m';
   }
 
   String getLeavesCount() {
-    return fullTimesheet.where((entry) => entry['status'] == 'Absent').length.toString();
+    return timesheet.where((entry) => entry['status'] == 'Absent').length.toString();
   }
 
   String getDaysWorked() {
-    return fullTimesheet.where((entry) => entry['status'] != 'Absent').length.toString();
+    return timesheet.where((entry) => entry['status'] != 'Absent').length.toString();
   }
 
   void exportToPdf() async {
@@ -83,13 +150,18 @@ class _UserTimesheetScreenState extends State<UserTimesheetScreen> {
         build: (pw.Context context) => pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            pw.Text('User Timesheet Report', style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
+            pw.Text('User Timesheet Report',
+                style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
             pw.SizedBox(height: 10),
-            ...fullTimesheet.map(
+            ...timesheet.map(
                   (day) => pw.Text(
-                "${day['date']} - ${day['checkIn']} to ${day['checkOut']} - ${day['status']} - ${calculateWorkedHours(day['checkIn']!, day['checkOut']!)}",
+                "${day['date']} - ${day['checkIn']} to ${day['checkOut']} - ${day['status']} - ${day['totalWorkedHours']}",
               ),
             ),
+            pw.SizedBox(height: 10),
+            pw.Text('Total Hours: ${getTotalHours()}'),
+            pw.Text('Days Worked: ${getDaysWorked()}'),
+            pw.Text('Leaves: ${getLeavesCount()}'),
           ],
         ),
       ),
@@ -109,7 +181,7 @@ class _UserTimesheetScreenState extends State<UserTimesheetScreen> {
           children: [
             Text("Check-In: ${day['checkIn']}"),
             Text("Check-Out: ${day['checkOut']}"),
-            Text("Hours Worked: ${calculateWorkedHours(day['checkIn']!, day['checkOut']!)}"),
+            Text("Hours Worked: ${day['totalWorkedHours']}"),
             Text("Status: ${day['status']}"),
           ],
         ),
@@ -131,7 +203,12 @@ class _UserTimesheetScreenState extends State<UserTimesheetScreen> {
         backgroundColor: Color(0xFF0D47A1),
         actions: [
           PopupMenuButton<String>(
-            onSelected: (val) => setState(() => selectedFilter = val),
+            onSelected: (val) {
+              setState(() {
+                selectedFilter = val;
+                _fetchTimesheet();
+              });
+            },
             itemBuilder: (context) => [
               PopupMenuItem(value: 'This Week', child: Text('This Week')),
               PopupMenuItem(value: 'This Month', child: Text('This Month')),
@@ -166,10 +243,12 @@ class _UserTimesheetScreenState extends State<UserTimesheetScreen> {
             ),
           ),
           Expanded(
-            child: ListView.builder(
-              itemCount: fullTimesheet.length,
+            child: timesheet.isEmpty
+                ? Center(child: CircularProgressIndicator())
+                : ListView.builder(
+              itemCount: timesheet.length,
               itemBuilder: (context, index) {
-                final day = fullTimesheet[index];
+                final day = timesheet[index];
                 return GestureDetector(
                   onTap: () => showDetailDialog(day),
                   child: Card(
@@ -183,7 +262,7 @@ class _UserTimesheetScreenState extends State<UserTimesheetScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text("Check-In: ${day['checkIn']}  |  Check-Out: ${day['checkOut']}"),
-                          Text("Hours: ${calculateWorkedHours(day['checkIn']!, day['checkOut']!)}"),
+                          Text("Hours: ${day['totalWorkedHours']}"),
                         ],
                       ),
                       trailing: Chip(

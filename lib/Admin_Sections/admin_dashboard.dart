@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hrms_project/Admin_Sections/admin_notification.dart';
-
 import 'EmployeeListPage.dart';
 import 'admin _Attandencemonitor.dart';
 import 'admin_holidaycalender.dart';
@@ -20,6 +20,10 @@ class EmployeeApp extends StatelessWidget {
     return MaterialApp(
       home: DashboardScreen(),
       debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        scaffoldBackgroundColor: Colors.grey[100],
+      ),
     );
   }
 }
@@ -36,6 +40,10 @@ class DashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    final adminName = user?.displayName ?? 'Admin';
+    final adminImage = user?.photoURL ?? 'assets/profile/adminimage.jpg';
+
     return Scaffold(
       backgroundColor: Colors.grey[100],
       body: SafeArea(
@@ -44,7 +52,7 @@ class DashboardScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Profile Row (without search icon)
+              // Profile Row
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -52,29 +60,36 @@ class DashboardScreen extends StatelessWidget {
                     children: [
                       CircleAvatar(
                         radius: 30,
-                        backgroundImage: AssetImage('assets/profile'
-                            '/adminimage.jpg'),
+                        backgroundImage: adminImage.startsWith('assets')
+                            ? AssetImage(adminImage)
+                            : NetworkImage(adminImage) as ImageProvider,
                       ),
-                      SizedBox(height: 16),
-                      SizedBox(width: 25),
-                      Text("Pradeep Tamar",
-                          style: TextStyle(
-                              fontSize: 22, fontWeight: FontWeight.bold)),
+                      const SizedBox(width: 25),
+                      Text(
+                        adminName,
+                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                      ),
                     ],
                   ),
                   IconButton(
                     icon: Icon(Icons.notifications),
                     onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) =>AdminNotification()),
-                      );
+                      try {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => AdminNotification()),
+                        );
+                      } catch (e) {
+                        print('Error navigating to AdminNotification: $e');
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Failed to open notifications: $e'), backgroundColor: Colors.red),
+                        );
+                      }
                     },
                   ),
-
                 ],
               ),
-              SizedBox(height: 70),
+              const SizedBox(height: 70),
 
               // Grid
               Expanded(
@@ -85,58 +100,65 @@ class DashboardScreen extends StatelessWidget {
                   children: gridItems.map((item) {
                     return GestureDetector(
                       onTap: () {
-                        if (item["label"] == "Leave Management") {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) => LeaveRequestsPage()),
+                        try {
+                          if (item["label"] == "Employee Management") {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => EmployeeListPage()),
+                            );
+                          } else if (item["label"] == "Attendance Monitoring") {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => AttendanceMonitoringScreen()),
+                            );
+                          } else if (item["label"] == "Leave Management") {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => LeaveRequestsPage()),
+                            );
+                          } else if (item["label"] == "TimeSheets") {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => TimesheetPage()),
+                            );
+                          } else if (item["label"] == "Holiday Calendar") {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => HolidayCalendarAdminScreen()),
+                            );
+                          } else if (item["label"] == "Performance Review") {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => AddPerformanceReviewScreen()),
+                            );
+                          }
+                        } catch (e) {
+                          print('Error navigating to ${item["label"]}: $e');
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Failed to open ${item["label"]}: $e'), backgroundColor: Colors.red),
                           );
                         }
-                         else if (item["label"] == "Employee Management") {
-                         Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                          builder: (context) => EmployeeListPage()),
-                          );}
-                        else if (item["label"] == "TimeSheets") {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) => TimesheetPage()),
-                          );}
-                        else if (item["label"] == "Holiday Calendar") {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) => HolidayCalendarAdminScreen()),
-                          );}
-                        else if (item["label"] == "Performance Review") {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) => AddPerformanceReviewScreen(employeeName: 'Ansh',)),
-                          );}
-                        else if (item["label"] == "Attendance Monitoring") {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) =>AttendanceMonitoringScreen()),
-                          );}
                       },
                       child: Container(
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withOpacity(0.2),
+                              spreadRadius: 2,
+                              blurRadius: 5,
+                              offset: Offset(0, 3),
+                            ),
+                          ],
                         ),
                         child: Center(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(item["icon"],
-                                  size: 50, color: Colors.blueAccent),
-                              SizedBox(height: 10),
-                              Text(item["label"],
-                                  style: TextStyle(fontSize: 16)),
+                              Icon(item["icon"], size: 50, color: Colors.blueAccent),
+                              const SizedBox(height: 10),
+                              Text(item["label"], style: TextStyle(fontSize: 16)),
                             ],
                           ),
                         ),
@@ -155,35 +177,37 @@ class DashboardScreen extends StatelessWidget {
         unselectedItemColor: Colors.grey,
         backgroundColor: Colors.black,
         onTap: (index) {
-          if (index == 1) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) =>  ProjectScreen ()),
-            );
-          }
-          else if (index == 2) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) =>  AdminProfile ()),
-            );
-          } else if (index == 3) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => AdminSetting()),
+          try {
+            if (index == 1) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => ProjectScreen()),
+              );
+            } else if (index == 2) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => AdminProfile()),
+              );
+            } else if (index == 3) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => AdminSetting()),
+              );
+            }
+          } catch (e) {
+            print('Error navigating to bottom nav index $index: $e');
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Failed to navigate: $e'), backgroundColor: Colors.red),
             );
           }
         },
         items: const [
-          BottomNavigationBarItem(
-              icon: Icon(Icons.dashboard), label: 'Dashboard'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.insert_chart), label: 'Projects'),
+          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
+          BottomNavigationBarItem(icon: Icon(Icons.insert_chart), label: 'Projects'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.settings), label: 'Setting'),
+          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Setting'),
         ],
       ),
-
     );
   }
 }

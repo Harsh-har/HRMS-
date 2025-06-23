@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'emp_managment.dart';
+
+import '../Employee_Sections/UserTimesheetScreen.dart';
 
 class EmployeeListPage extends StatefulWidget {
   const EmployeeListPage({Key? key}) : super(key: key);
@@ -14,7 +15,7 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
   String _searchQuery = "";
 
   Stream<QuerySnapshot> getEmployeesStream() {
-    return FirebaseFirestore.instance.collection('employees').limit(10).snapshots();
+    return FirebaseFirestore.instance.collection('employees').snapshots();
   }
 
   @override
@@ -31,7 +32,8 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
       final data = employee.data() as Map<String, dynamic>;
       final name = data['name']?.toString().toLowerCase() ?? '';
       final designation = data['designation']?.toString().toLowerCase() ?? '';
-      return name.contains(query.toLowerCase()) || designation.contains(query.toLowerCase());
+      return name.contains(query.toLowerCase()) ||
+          designation.contains(query.toLowerCase());
     }).toList();
   }
 
@@ -40,21 +42,10 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text("Employee List"),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.add),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => EmployeeForm()),
-              );
-            },
-          )
-        ],
+        backgroundColor: Colors.blue,
       ),
       body: Column(
         children: [
-          // 🔍 Search Bar
           Padding(
             padding: const EdgeInsets.all(12.0),
             child: TextField(
@@ -81,7 +72,8 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
                   return Center(child: CircularProgressIndicator());
                 }
 
-                final filteredEmployees = _filterEmployees(snapshot.data!.docs, _searchQuery);
+                final filteredEmployees =
+                _filterEmployees(snapshot.data!.docs, _searchQuery);
 
                 if (filteredEmployees.isEmpty) {
                   return Center(child: Text("No matching employees found."));
@@ -92,12 +84,30 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
                   itemBuilder: (context, index) {
                     final data = filteredEmployees[index].data() as Map<String, dynamic>;
 
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundImage: NetworkImage(data['profileImage'] ?? ''),
+                    return Card(
+                      margin: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundImage: NetworkImage(data['profileImage'] ?? ''),
+                        ),
+                        title: Text(data['name'] ?? 'No Name'),
+                        subtitle: Text(data['designation'] ?? 'No Designation'),
+                        trailing: Icon(Icons.arrow_forward_ios, size: 16),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => UserTimesheetScreen(
+                                employeeData: {
+                                  'name': data['name'],
+                                  'profileImage': data['profileImage'],
+                                  'designation': data['designation'],
+                                },
+                              ),
+                            ),
+                          );
+                        },
                       ),
-                      title: Text(data['name'] ?? 'No Name'),
-                      subtitle: Text(data['designation'] ?? 'No Designation'),
                     );
                   },
                 );

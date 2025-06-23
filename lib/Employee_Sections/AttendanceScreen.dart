@@ -272,7 +272,7 @@ class _NewAttendanceScreenState extends State<NewAttendanceScreen>
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text("Attendance Dashboard"),
+        title: const Text("Attendance Dashboard",style: TextStyle(color: Colors.white),),
         backgroundColor: Colors.indigo[700],
         elevation: 0,
         centerTitle: true,

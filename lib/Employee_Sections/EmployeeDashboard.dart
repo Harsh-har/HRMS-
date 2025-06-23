@@ -50,7 +50,7 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
         destination = UserProjectScreen(employeeData: widget.employeeData);
         break;
       case 3:
-        destination = UserTimesheetScreen();
+        destination = UserTimesheetScreen (employeeData: widget.employeeData);
         break;
     }
 
