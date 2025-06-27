@@ -1,201 +1,202 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-void main() => runApp(MyApp());
-
-class MyApp extends StatelessWidget {
+class LeaveRequestsPage extends StatefulWidget {
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: LeaveRequestsPage(),
-    );
-  }
+  State<LeaveRequestsPage> createState() => _LeaveRequestsPageState();
 }
 
-class LeaveRequestsPage extends StatelessWidget {
+class _LeaveRequestsPageState extends State<LeaveRequestsPage>
+    with SingleTickerProviderStateMixin {
+  TabController? _tabController;
+  String _searchQuery = "";
+
+  final List<String> _statuses = ["Pending", "Approved", "Rejected"];
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: _statuses.length, vsync: this);
+  }
+
+  void _updateSearch(String value) {
+    setState(() => _searchQuery = value.trim().toLowerCase());
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text('Leave Requests'),
-        leading: Icon(Icons.arrow_back),
-        actions: [
-          Icon(Icons.search),
-          Stack(
-            children: [
-              Icon(Icons.notifications),
-              Positioned(
-                top: 5,
-                right: 0,
-                child: CircleAvatar(radius: 4, backgroundColor: Colors.pink),
-              ),
-            ],
-          ),
-          SizedBox(width: 12),
-        ],
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
-        elevation: 0,
+        elevation: 1,
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: Colors.blue,
+          unselectedLabelColor: Colors.grey,
+          indicatorColor: Colors.blue,
+          tabs: [
+            Tab(text: 'Pending'),
+            Tab(text: 'Approved'),
+            Tab(text: 'Rejected'),
+          ],
+        ),
       ),
       body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              children: [
-                Text(
-                  'PENDING REQUESTS',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                Spacer(),
-                Text('HISTORY', style: TextStyle(color: Colors.grey)),
-              ],
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: TextField(
+              onChanged: _updateSearch,
+              decoration: InputDecoration(
+                hintText: "Search by name or employee ID",
+                prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
             ),
           ),
           Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('leave_requests')
-                  .where('status', isEqualTo: 'Pending') // Show only pending
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Center(child: CircularProgressIndicator());
-                }
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return Center(child: Text('No pending leave requests.'));
-                }
-
-                final leaveRequests = snapshot.data!.docs;
-
-                return ListView.builder(
-                  itemCount: leaveRequests.length,
-                  itemBuilder: (context, index) {
-                    final doc = leaveRequests[index];
-                    final request = doc.data() as Map<String, dynamic>;
-
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
-                      child: Card(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        elevation: 4,
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  CircleAvatar(
-                                    backgroundImage: NetworkImage(request['image'] ?? 'https://via.placeholder.com/150'),
-                                    radius: 24,
-                                  ),
-                                  SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      request['name'] ?? '',
-                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                    ),
-                                  ),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      Container(
-                                        decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          border: Border.all(
-                                            color: request['type'] == 'Sick Leave'
-                                                ? Colors.green
-                                                : Colors.blue,
-                                          ),
-                                          borderRadius: BorderRadius.circular(16),
-                                        ),
-                                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                        child: Text(
-                                          request['type'] ?? '',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: request['type'] == 'Sick Leave'
-                                                ? Colors.green
-                                                : Colors.blue,
-                                          ),
-                                        ),
-                                      ),
-                                      SizedBox(height: 4),
-                                      Text('Applied on\n${request['applied'] ?? ''}', textAlign: TextAlign.right),
-                                    ],
-                                  )
-                                ],
-                              ),
-                              SizedBox(height: 12),
-                              Text('Leave Date\n${request['date'] ?? ''}'),
-                              SizedBox(height: 4),
-                              Text('Duration\n${request['duration'] ?? ''}'),
-                              if ((request['balance'] ?? '').toString().isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 4.0),
-                                  child: Text('Leave Balance\n${request['balance']}'),
-                                ),
-                              SizedBox(height: 4),
-                              Text('Reason\n${request['reason'] ?? ''}'),
-                              SizedBox(height: 12),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  ElevatedButton(
-                                    onPressed: () {
-                                      FirebaseFirestore.instance
-                                          .collection('leave_requests')
-                                          .doc(doc.id)
-                                          .update({'status': 'Approved'});
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.green.shade100,
-                                      foregroundColor: Colors.green.shade900,
-                                    ),
-                                    child: Text('APPROVE'),
-                                  ),
-                                  ElevatedButton(
-                                    onPressed: () {
-                                      FirebaseFirestore.instance
-                                          .collection('leave_requests')
-                                          .doc(doc.id)
-                                          .update({'status': 'Rejected'});
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.red.shade100,
-                                      foregroundColor: Colors.red.shade900,
-                                    ),
-                                    child: Text('REJECT'),
-                                  ),
-                                ],
-                              )
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
+            child: TabBarView(
+              controller: _tabController,
+              children: _statuses.map((status) {
+                return _buildLeaveList(status);
+              }).toList(),
             ),
-          )
-        ],
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: Colors.white,
-        unselectedItemColor: Colors.grey,
-        backgroundColor: Colors.black,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
-          BottomNavigationBarItem(icon: Icon(Icons.insert_chart), label: 'Projects'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Setting'),
+          ),
         ],
       ),
     );
   }
+
+  Widget _buildLeaveList(String status) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('leave_requests')
+          .where('status', isEqualTo: status)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting)
+          return Center(child: CircularProgressIndicator());
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty)
+          return Center(child: Text('No $status leave requests.'));
+
+        final docs = snapshot.data!.docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          final name = (data['employeeName'] ?? '').toString().toLowerCase();
+          final empId = (data['employeeId'] ?? '').toString().toLowerCase();
+          return name.contains(_searchQuery) || empId.contains(_searchQuery);
+        }).toList();
+
+        if (docs.isEmpty)
+          return Center(child: Text('No results for "$_searchQuery"'));
+
+        return ListView.builder(
+          padding: EdgeInsets.all(16),
+          itemCount: docs.length,
+          itemBuilder: (context, index) {
+            final doc = docs[index];
+            final data = doc.data() as Map<String, dynamic>;
+
+            return _buildLeaveCard(doc.id, data);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildLeaveCard(String docId, Map<String, dynamic> data) {
+    return Card(
+      margin: EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 3,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 26,
+                backgroundImage:
+                NetworkImage(data['image'] ?? 'https://via.placeholder.com/150'),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(data['employeeName'] ?? '', style: TextStyle(fontWeight: FontWeight.bold)),
+                  SizedBox(height: 4),
+                  Text('ID: ${data['employeeId'] ?? 'N/A'}',
+                      style: TextStyle(color: Colors.grey[700])),
+                ]),
+              ),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: (data['leaveType'] == 'Sick Leave') ? Colors.green[100] : Colors.blue[100],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(data['leaveType'] ?? '',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: (data['leaveType'] == 'Sick Leave')
+                            ? Colors.green[800]
+                            : Colors.blue[800])),
+              ),
+            ],
+          ),
+          SizedBox(height: 12),
+
+          _info("Start Date", data['startDate']),
+          _info("End Date", data['endDate']),
+          _info("Half Day", data['isHalfDay'] == true ? 'Yes' : 'No'),
+          _info("Reason", data['reason']),
+          SizedBox(height: 12),
+
+          if (data['status'] == 'Pending')
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _button("APPROVE", Colors.green, () {
+                  FirebaseFirestore.instance
+                      .collection('leave_requests')
+                      .doc(docId)
+                      .update({'status': 'Approved'});
+                }),
+                _button("REJECT", Colors.red, () {
+                  FirebaseFirestore.instance
+                      .collection('leave_requests')
+                      .doc(docId)
+                      .update({'status': 'Rejected'});
+                }),
+              ],
+            ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _info(String label, dynamic value) => Padding(
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text("$label: ", style: TextStyle(fontWeight: FontWeight.bold)),
+        Expanded(
+          child: Text(value?.toString() ?? '-', style: TextStyle(color: Colors.grey[800])),
+        ),
+      ],
+    ),
+  );
+
+  Widget _button(String text, Color color, VoidCallback onTap) => ElevatedButton(
+    onPressed: onTap,
+    style: ElevatedButton.styleFrom(
+      backgroundColor: color.withOpacity(0.1),
+      foregroundColor: color.withOpacity(0.8),
+      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+    ),
+    child: Text(text),
+  );
 }

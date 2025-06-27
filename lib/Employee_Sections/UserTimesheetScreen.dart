@@ -25,20 +25,25 @@ class _UserTimesheetScreenState extends State<UserTimesheetScreen> {
 
   Future<void> _fetchTimesheet() async {
     final name = widget.employeeData['name'];
-    final days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    List<Map<String, String>> records = [];
     final now = DateTime.now();
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
     final startOfMonth = DateTime(now.year, now.month, 1);
     final endOfMonth = DateTime(now.year, now.month + 1, 0);
 
-    for (var day in days) {
-      final snapshots = await FirebaseFirestore.instance
+    final days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    List<Map<String, String>> records = [];
+
+    final futures = days.map((day) {
+      return FirebaseFirestore.instance
           .collection('attendance')
           .doc(name)
           .collection(day)
           .get();
+    }).toList();
 
+    final results = await Future.wait(futures);
+
+    for (var snapshots in results) {
       for (var doc in snapshots.docs) {
         final data = doc.data();
         final dateStr = data['date'];
@@ -71,7 +76,7 @@ class _UserTimesheetScreenState extends State<UserTimesheetScreen> {
               'checkOut': data['checkOut'] ?? '-',
               'status': status,
               'totalWorkedHours': data['totalWorkedHours'] ??
-                  calculateWorkedHours(data['checkIn'] ?? '-', data['checkOut'] ?? '-'),
+                  calculateWorkedHours(data['checkIn'] ?? '-', data['checkOut'] ?? '-')
             });
           }
         } catch (e) {
@@ -80,7 +85,6 @@ class _UserTimesheetScreenState extends State<UserTimesheetScreen> {
       }
     }
 
-    // Sort by date descending
     records.sort((a, b) {
       try {
         final dateA = DateFormat('dd MMM yyyy').parse(a['date']!);
@@ -261,8 +265,8 @@ class _UserTimesheetScreenState extends State<UserTimesheetScreen> {
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text("Check-In: ${day['checkIn']}  |  Check-Out: ${day['checkOut']}"),
-                          Text("Hours: ${day['totalWorkedHours']}"),
+                          Text("Check-In: ${day['checkIn']}  |  Check-Out: ${day['checkOut']}", maxLines: 1),
+                          Text("Hours: ${day['totalWorkedHours']}", maxLines: 1),
                         ],
                       ),
                       trailing: Chip(

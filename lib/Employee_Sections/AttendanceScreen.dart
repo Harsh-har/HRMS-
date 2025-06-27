@@ -54,31 +54,30 @@ class _NewAttendanceScreenState extends State<NewAttendanceScreen>
     });
   }
 
-  String _getDayName(DateTime date) {
-    return DateFormat('EEEE').format(date);
-  }
-
   Future<void> _fetchTodayAttendance() async {
-    final today = DateTime.now();
-    final dayName = _getDayName(today);
-    final doc = await FirebaseFirestore.instance
-        .collection('attendance')
-        .doc(widget.employeeData['name'])
-        .collection(dayName)
-        .doc('record')
-        .get();
+    final name = widget.employeeData['name'];
+    final today = DateFormat('dd MMM yyyy').format(DateTime.now());
+    final days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-    if (doc.exists) {
-      final data = doc.data()!;
-      setState(() {
-        checkInTime = data['checkIn'] != null
-            ? DateFormat('hh:mm a').parse(data['checkIn'])
-            : null;
-        checkOutTime = data['checkOut'] != null
-            ? DateFormat('hh:mm a').parse(data['checkOut'])
-            : null;
-        isCheckedIn = checkInTime != null && checkOutTime == null;
-      });
+    for (String day in days) {
+      final doc = await FirebaseFirestore.instance
+          .collection('attendance')
+          .doc(name)
+          .collection(day)
+          .doc('record')
+          .get();
+
+      if (doc.exists) {
+        final data = doc.data();
+        if (data != null && data['date'] == today) {
+          setState(() {
+            checkInTime = data['checkIn'] != null ? DateFormat('hh:mm a').parse(data['checkIn']) : null;
+            checkOutTime = data['checkOut'] != null ? DateFormat('hh:mm a').parse(data['checkOut']) : null;
+            isCheckedIn = checkInTime != null && checkOutTime == null;
+          });
+          return;
+        }
+      }
     }
   }
 
@@ -97,15 +96,16 @@ class _NewAttendanceScreenState extends State<NewAttendanceScreen>
 
       if (snapshot.exists) {
         final data = snapshot.data()!;
-        records.add({
-          'date': data['date'] ?? '--',
-          'checkIn': data['checkIn'] ?? '--',
-          'checkOut': data['checkOut'] ?? '--',
-        });
+        if (data.containsKey('date')) {
+          records.add({
+            'date': data['date'] ?? '--',
+            'checkIn': data['checkIn'] ?? '--',
+            'checkOut': data['checkOut'] ?? '--',
+          });
+        }
       }
     }
 
-    // Sort records by date in descending order
     records.sort((a, b) {
       try {
         final dateA = DateFormat('dd MMM yyyy').parse(a['date']);
@@ -141,25 +141,11 @@ class _NewAttendanceScreenState extends State<NewAttendanceScreen>
             final date = DateFormat('dd MMM yyyy').parse(data['date']);
             final checkInTime = DateFormat('hh:mm a').parse(data['checkIn']);
             final checkOutTime = DateFormat('hh:mm a').parse(data['checkOut']);
-            // Combine date with time
-            final checkIn = DateTime(
-              date.year,
-              date.month,
-              date.day,
-              checkInTime.hour,
-              checkInTime.minute,
-            );
-            final checkOut = DateTime(
-              date.year,
-              date.month,
-              date.day,
-              checkOutTime.hour,
-              checkOutTime.minute,
-            );
+            final checkIn = DateTime(date.year, date.month, date.day, checkInTime.hour, checkInTime.minute);
+            final checkOut = DateTime(date.year, date.month, date.day, checkOutTime.hour, checkOutTime.minute);
             final worked = checkOut.difference(checkIn);
             total += worked.inMinutes / 60.0;
           } catch (e) {
-            // Skip invalid records
             continue;
           }
         }
@@ -173,7 +159,7 @@ class _NewAttendanceScreenState extends State<NewAttendanceScreen>
 
   Future<void> _handleSlideComplete() async {
     final now = DateTime.now();
-    final dayName = _getDayName(now);
+    final dayName = DateFormat('EEEE').format(now);
     final dateFormatted = DateFormat('dd MMM yyyy').format(now);
     final docRef = FirebaseFirestore.instance
         .collection('attendance')
@@ -214,21 +200,9 @@ class _NewAttendanceScreenState extends State<NewAttendanceScreen>
       if (data.containsKey('checkIn') && !data.containsKey('checkOut')) {
         final date = DateFormat('dd MMM yyyy').parse(data['date']);
         final checkInTime = DateFormat('hh:mm a').parse(data['checkIn']);
-        final checkIn = DateTime(
-          date.year,
-          date.month,
-          date.day,
-          checkInTime.hour,
-          checkInTime.minute,
-        );
+        final checkIn = DateTime(date.year, date.month, date.day, checkInTime.hour, checkInTime.minute);
         checkOutTime = now;
-        final checkOut = DateTime(
-          date.year,
-          date.month,
-          date.day,
-          now.hour,
-          now.minute,
-        );
+        final checkOut = DateTime(date.year, date.month, date.day, now.hour, now.minute);
         final worked = checkOut.difference(checkIn);
         final hours = worked.inMinutes / 60.0;
         final hr = hours.floor();
@@ -272,7 +246,7 @@ class _NewAttendanceScreenState extends State<NewAttendanceScreen>
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text("Attendance Dashboard",style: TextStyle(color: Colors.white),),
+        title: const Text("Attendance Dashboard", style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.indigo[700],
         elevation: 0,
         centerTitle: true,
@@ -295,64 +269,18 @@ class _NewAttendanceScreenState extends State<NewAttendanceScreen>
                   children: [
                     Text(
                       "Hello, ${widget.employeeData['name']}",
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.indigo[900],
-                      ),
+                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.indigo[900]),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       "$_dateString | $_timeString",
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.indigo[400],
-                      ),
+                      style: TextStyle(fontSize: 16, color: Colors.indigo[400]),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 16),
-              Card(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                elevation: 4,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Today's Activity",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.indigo[800],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          _buildInfoColumn(
-                            "Check In",
-                            checkInTime != null
-                                ? DateFormat('hh:mm a').format(checkInTime!)
-                                : '--',
-                          ),
-                          _buildInfoColumn(
-                            "Check Out",
-                            checkOutTime != null
-                                ? DateFormat('hh:mm a').format(checkOutTime!)
-                                : '--',
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              _buildTodayCard(),
               const SizedBox(height: 24),
               SlideAction(
                 key: _slideKey,
@@ -360,96 +288,83 @@ class _NewAttendanceScreenState extends State<NewAttendanceScreen>
                 elevation: 6,
                 innerColor: isCheckedIn ? Colors.red[600] : Colors.green[600],
                 outerColor: isCheckedIn ? Colors.red[100] : Colors.green[100],
-                sliderButtonIcon: Icon(
-                  isCheckedIn ? Icons.logout : Icons.login,
-                  color: Colors.white,
-                ),
+                sliderButtonIcon: Icon(isCheckedIn ? Icons.logout : Icons.login, color: Colors.white),
                 text: isCheckedIn ? 'Slide to Check Out' : 'Slide to Check In',
-                textStyle: const TextStyle(
-                  color: Colors.black87,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
+                textStyle: const TextStyle(color: Colors.black87, fontSize: 16, fontWeight: FontWeight.w600),
                 onSubmit: _handleSlideComplete,
               ),
               const SizedBox(height: 24),
-              Card(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                elevation: 4,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Attendance Summary",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.indigo[800],
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        "Total Worked: ${_formatTotalWorkedHours(totalWorkedHours)}",
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.indigo[600],
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        "Last 5 Attendance Records",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.indigo[800],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      lastFiveRecords.isEmpty
-                          ? const Center(
-                        child: Text(
-                          "No records found",
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      )
-                          : ListView.separated(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: lastFiveRecords.length,
-                        separatorBuilder: (context, index) =>
-                        const Divider(),
-                        itemBuilder: (context, index) {
-                          final record = lastFiveRecords[index];
-                          return ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(
-                              "Date: ${record['date']}",
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment:
-                              CrossAxisAlignment.start,
-                              children: [
-                                Text("Check In: ${record['checkIn']}"),
-                                Text("Check Out: ${record['checkOut']}"),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              _buildSummaryCard(),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTodayCard() {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Today's Activity", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.indigo[800])),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildInfoColumn("Check In", checkInTime != null ? DateFormat('hh:mm a').format(checkInTime!) : '--'),
+                _buildInfoColumn("Check Out", checkOutTime != null ? DateFormat('hh:mm a').format(checkOutTime!) : '--'),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryCard() {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Attendance Summary", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.indigo[800])),
+            const SizedBox(height: 8),
+            Text("Total Worked: ${_formatTotalWorkedHours(totalWorkedHours)}",
+                style: TextStyle(fontSize: 16, color: Colors.indigo[600], fontWeight: FontWeight.w600)),
+            const SizedBox(height: 16),
+            Text("Last 5 Attendance Records", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.indigo[800])),
+            const SizedBox(height: 16),
+            lastFiveRecords.isEmpty
+                ? const Center(child: Text("No records found", style: TextStyle(color: Colors.grey)))
+                : ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: lastFiveRecords.length,
+              separatorBuilder: (context, index) => const Divider(),
+              itemBuilder: (context, index) {
+                final record = lastFiveRecords[index];
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text("Date: ${record['date']}", style: const TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("Check In: ${record['checkIn']}"),
+                      Text("Check Out: ${record['checkOut']}")
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
         ),
       ),
     );
@@ -458,22 +373,9 @@ class _NewAttendanceScreenState extends State<NewAttendanceScreen>
   Widget _buildInfoColumn(String title, String value) {
     return Column(
       children: [
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.indigo[600],
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        Text(title, style: TextStyle(fontSize: 14, color: Colors.indigo[600], fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
       ],
     );
   }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 class SubmitLeaveRequestPage extends StatefulWidget {
   final Map<String, dynamic> employeeData;
@@ -17,6 +19,8 @@ class _SubmitLeaveRequestPageState extends State<SubmitLeaveRequestPage> {
   DateTime? _endDate;
   String? _leaveType;
   bool _isHalfDay = false;
+  PlatformFile? _pickedFile;
+  String? _fileUrl;
 
   final List<String> _leaveTypes = [
     'Casual Leave',
@@ -28,6 +32,51 @@ class _SubmitLeaveRequestPageState extends State<SubmitLeaveRequestPage> {
     'Work From Home',
   ];
 
+  final Map<String, int> _leaveLimits = {
+    'Casual Leave': 5,
+    'Sick Leave': 5,
+    'Earned Leave': 5,
+    'Maternity Leave': 3,
+    'Paternity Leave': 2,
+    'Comp Off': 3,
+    'Work From Home': 2,
+  };
+
+  Map<String, int> _pendingByType = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchPendingLeaves();
+  }
+
+  Future<void> _fetchPendingLeaves() async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('leave_requests')
+        .where('employeeId', isEqualTo: widget.employeeData['employeeId'])
+        .where('status', isEqualTo: 'Pending')
+        .get();
+
+    Map<String, int> typeCount = {};
+    for (var doc in snapshot.docs) {
+      final type = doc['leaveType'] ?? '';
+      typeCount[type] = (typeCount[type] ?? 0) + 1;
+    }
+
+    setState(() {
+      _pendingByType = typeCount;
+    });
+  }
+
+  Future<void> _pickFile() async {
+    final result = await FilePicker.platform.pickFiles(type: FileType.any);
+    if (result != null) {
+      setState(() {
+        _pickedFile = result.files.first;
+      });
+    }
+  }
+
   void _submitRequest() async {
     if (_leaveType == null || _startDate == null || _endDate == null || _reasonController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -36,14 +85,23 @@ class _SubmitLeaveRequestPageState extends State<SubmitLeaveRequestPage> {
       return;
     }
 
+    if (_pickedFile != null) {
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('leave_attachments/${_pickedFile!.name}');
+      final uploadTask = await ref.putData(_pickedFile!.bytes!);
+      _fileUrl = await uploadTask.ref.getDownloadURL();
+    }
+
     final leaveData = {
-      'employeeId': widget.employeeData['id'],
+      'employeeId': widget.employeeData['employeeId'],
       'employeeName': widget.employeeData['name'],
       'leaveType': _leaveType,
       'isHalfDay': _isHalfDay,
       'startDate': DateFormat('yyyy-MM-dd').format(_startDate!),
       'endDate': DateFormat('yyyy-MM-dd').format(_endDate!),
       'reason': _reasonController.text.trim(),
+      'attachmentUrl': _fileUrl,
       'status': 'Pending',
       'timestamp': FieldValue.serverTimestamp(),
     };
@@ -53,6 +111,7 @@ class _SubmitLeaveRequestPageState extends State<SubmitLeaveRequestPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text("Leave request submitted")),
     );
+
     Navigator.pop(context);
   }
 
@@ -77,29 +136,71 @@ class _SubmitLeaveRequestPageState extends State<SubmitLeaveRequestPage> {
     }
   }
 
-  Widget _buildSectionTitle(String text) {
-    return Text(
-      text,
-      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-    );
-  }
+  Widget _buildLeaveHistory() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('leave_requests')
+          .where('employeeId', isEqualTo: widget.employeeData['employeeId'])
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const CircularProgressIndicator();
+        final leaves = snapshot.data!.docs;
 
-  Widget _buildDateTile(String label, DateTime? date, VoidCallback onTap) {
-    return ListTile(
-      onTap: onTap,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      tileColor: Colors.grey.shade100,
-      leading: const Icon(Icons.calendar_today),
-      title: Text(
-        date == null ? label : DateFormat('dd MMM yyyy').format(date),
-        style: const TextStyle(fontSize: 14),
-      ),
-      trailing: const Icon(Icons.arrow_drop_down),
+        if (leaves.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.only(top: 20),
+            child: Text("No leave history found."),
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 24),
+            const Text("Leave Request History", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 12),
+            ...leaves.map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              return Card(
+                margin: const EdgeInsets.only(bottom: 10),
+                child: ListTile(
+                  leading: Icon(
+                    Icons.event_note,
+                    color: data['status'] == 'Approved'
+                        ? Colors.green
+                        : data['status'] == 'Rejected'
+                        ? Colors.red
+                        : Colors.orange,
+                  ),
+                  title: Text("${data['leaveType']}"),
+                  subtitle: Text(
+                    "From ${data['startDate']} to ${data['endDate']}\nReason: ${data['reason']}",
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                  trailing: Text(
+                    data['status'],
+                    style: TextStyle(
+                      color: data['status'] == 'Approved'
+                          ? Colors.green
+                          : data['status'] == 'Rejected'
+                          ? Colors.red
+                          : Colors.orange,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ],
+        );
+      },
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final employeeId = widget.employeeData['employeeId'] ?? 'N/A';
+
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
@@ -112,109 +213,140 @@ class _SubmitLeaveRequestPageState extends State<SubmitLeaveRequestPage> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // LEAVE TYPE
-            Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildSectionTitle("Leave Type"),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                      ),
-                      value: _leaveType,
-                      items: _leaveTypes
-                          .map((type) => DropdownMenuItem(value: type, child: Text(type)))
-                          .toList(),
-                      hint: const Text("Select Leave Type"),
-                      onChanged: (val) => setState(() => _leaveType = val),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text("Is Half Day?", style: TextStyle(fontSize: 14)),
-                        Switch(
-                          value: _isHalfDay,
-                          onChanged: (val) => setState(() => _isHalfDay = val),
-                        )
-                      ],
-                    )
-                  ],
-                ),
-              ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text("Employee ID: $employeeId",
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),),
             ),
-
-            const SizedBox(height: 16),
-
-            // DATE PICKERS
-            Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    _buildSectionTitle("Leave Dates"),
-                    const SizedBox(height: 8),
-                    _buildDateTile("Start Date", _startDate, () => _pickDate(true)),
-                    const SizedBox(height: 12),
-                    _buildDateTile("End Date", _endDate, () => _pickDate(false)),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // REASON
-            Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildSectionTitle("Reason"),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _reasonController,
-                      maxLines: 5,
-                      decoration: InputDecoration(
-                        hintText: "Write your reason here...",
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        filled: true,
-                        fillColor: Colors.grey.shade100,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // SUBMIT BUTTON
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.send),
-                onPressed: _submitRequest,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  backgroundColor: Colors.blueAccent,
-                ),
-                label: const Text("Submit Leave Request", style: TextStyle(fontSize: 16)),
-              ),
-            ),
+            const SizedBox(height: 12),
+            _buildForm(),
+            _buildLeaveHistory(),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildForm() {
+    return Column(
+      children: [
+        Card(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          margin: const EdgeInsets.only(bottom: 12),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("Leave Type", style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  ),
+                  value: _leaveType,
+                  items: _leaveTypes.map((type) => DropdownMenuItem(value: type, child: Text(type))).toList(),
+                  hint: const Text("Select Leave Type"),
+                  onChanged: (val) => setState(() => _leaveType = val),
+                ),
+                if (_leaveType != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      "Pending: ${_pendingByType[_leaveType] ?? 0} | Remaining: ${(_leaveLimits[_leaveType] ?? 0) - (_pendingByType[_leaveType] ?? 0)}",
+                      style: const TextStyle(fontSize: 13, color: Colors.black),
+                    ),
+                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text("Half Day?"),
+                    Switch(
+                      value: _isHalfDay,
+                      onChanged: (val) => setState(() => _isHalfDay = val),
+                    )
+                  ],
+                )
+              ],
+            ),
+          ),
+        ),
+        Card(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          margin: const EdgeInsets.only(bottom: 12),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              children: [
+                ListTile(
+                  title: Text(_startDate == null ? "Start Date" : DateFormat('dd MMM yyyy').format(_startDate!)),
+                  leading: const Icon(Icons.date_range),
+                  onTap: () => _pickDate(true),
+                ),
+                ListTile(
+                  title: Text(_endDate == null ? "End Date" : DateFormat('dd MMM yyyy').format(_endDate!)),
+                  leading: const Icon(Icons.date_range),
+                  onTap: () => _pickDate(false),
+                )
+              ],
+            ),
+          ),
+        ),
+        Card(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          margin: const EdgeInsets.only(bottom: 12),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: TextField(
+              controller: _reasonController,
+              maxLines: 4,
+              decoration: InputDecoration(
+                hintText: "Reason for leave",
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                filled: true,
+                fillColor: Colors.grey.shade100,
+              ),
+            ),
+          ),
+        ),
+        Card(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          margin: const EdgeInsets.only(bottom: 12),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.attach_file, size: 16),
+                  label: const Text("Choose File", style: TextStyle(fontSize: 13)),
+                  onPressed: _pickFile,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _pickedFile?.name ?? "No file selected",
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            onPressed: _submitRequest,
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              backgroundColor: Colors.blue.shade600,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text("Submit Leave Request", style: TextStyle(fontSize: 14)),
+          ),
+        ),
+      ],
     );
   }
 }

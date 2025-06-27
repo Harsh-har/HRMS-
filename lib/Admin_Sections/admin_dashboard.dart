@@ -41,7 +41,7 @@ class DashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-    final adminName = user?.displayName ?? 'Admin';
+    final adminName = user?.displayName ?? 'Pradeep Kumar';
     final adminImage = user?.photoURL ?? 'assets/profile/adminimage.jpg';
 
     return Scaffold(
@@ -119,7 +119,7 @@ class DashboardScreen extends StatelessWidget {
                           } else if (item["label"] == "TimeSheets") {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (context) => TimesheetPage()),
+                              MaterialPageRoute(builder: (context) => TimeSheetsPage()),
                             );
                           } else if (item["label"] == "Holiday Calendar") {
                             Navigator.push(
