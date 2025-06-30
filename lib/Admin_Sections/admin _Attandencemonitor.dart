@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 
 class AttendanceMonitoringScreen extends StatefulWidget {
   const AttendanceMonitoringScreen({super.key});
@@ -9,7 +10,23 @@ class AttendanceMonitoringScreen extends StatefulWidget {
 }
 
 class _AttendanceMonitoringScreenState extends State<AttendanceMonitoringScreen> {
-  String selectedStatus = 'All'; // Default: show all
+  String selectedStatus = 'All';
+  String selectedDate = DateFormat('dd MMM yyyy').format(DateTime.now());
+  bool isLoading = false;
+
+  Future<void> _selectDate(BuildContext context) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      setState(() {
+        selectedDate = DateFormat('dd MMM yyyy').format(picked);
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,24 +38,35 @@ class _AttendanceMonitoringScreenState extends State<AttendanceMonitoringScreen>
         elevation: 0.5,
         foregroundColor: Colors.black,
         actions: [
-          IconButton(onPressed: () {}, icon: const Icon(Icons.filter_list)),
-          IconButton(onPressed: () {}, icon: const Icon(Icons.picture_as_pdf)),
+          IconButton(
+            onPressed: () => _selectDate(context),
+            icon: const Icon(Icons.calendar_today),
+          ),
         ],
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('attendance').snapshots(),
+        stream: FirebaseFirestore.instance
+            .collection('attendance_records')
+            .doc(selectedDate)
+            .collection('employees')
+            .snapshots(),
         builder: (context, snapshot) {
-          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return Center(child: Text('No attendance data for $selectedDate'));
+          }
 
           final docs = snapshot.data!.docs;
 
+          // Calculate counts
           int presentCount = 0;
           int lateCount = 0;
           int absentCount = 0;
 
-          List<Map<String, dynamic>> attendanceList = [];
-
-          for (var doc in docs) {
+          final attendanceList = docs.map((doc) {
             final data = doc.data() as Map<String, dynamic>;
             final status = data['status'] ?? 'Absent';
 
@@ -46,8 +74,8 @@ class _AttendanceMonitoringScreenState extends State<AttendanceMonitoringScreen>
             else if (status == 'Late') lateCount++;
             else absentCount++;
 
-            attendanceList.add(data);
-          }
+            return data;
+          }).toList();
 
           // Apply filter
           final filteredList = selectedStatus == 'All'
@@ -69,6 +97,14 @@ class _AttendanceMonitoringScreenState extends State<AttendanceMonitoringScreen>
                 ),
               ),
               const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  'Showing data for: $selectedDate',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(height: 8),
               Expanded(
                 child: filteredList.isEmpty
                     ? const Center(child: Text("No data found for selected status."))
@@ -80,8 +116,13 @@ class _AttendanceMonitoringScreenState extends State<AttendanceMonitoringScreen>
                     final data = filteredList[index];
                     final name = data['name'] ?? 'Unknown';
                     final status = data['status'] ?? 'Absent';
-                    final checkIn = data['checkIn'] ?? '-';
-                    final checkOut = data['checkOut'] ?? '-';
+                    final checkIn = data['checkIn'] != null
+                        ? DateFormat('hh:mm a').format(data['checkIn'].toDate())
+                        : '-';
+                    final checkOut = data['checkOut'] != null
+                        ? DateFormat('hh:mm a').format(data['checkOut'].toDate())
+                        : '-';
+                    final workedHours = data['workedHours'] ?? '-';
                     final profileImage = data['profileImage'] ?? 'https://via.placeholder.com/150';
 
                     return Container(
@@ -105,9 +146,13 @@ class _AttendanceMonitoringScreenState extends State<AttendanceMonitoringScreen>
                         title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
                         subtitle: Padding(
                           padding: const EdgeInsets.only(top: 4.0),
-                          child: Text(
-                            'Check-In: $checkIn\nCheck-Out: $checkOut',
-                            style: const TextStyle(fontSize: 13, height: 1.4),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Check-In: $checkIn'),
+                              Text('Check-Out: $checkOut'),
+                              if (workedHours != '-') Text('Worked: $workedHours'),
+                            ],
                           ),
                         ),
                         trailing: _buildStatusBadge(status),
@@ -116,7 +161,6 @@ class _AttendanceMonitoringScreenState extends State<AttendanceMonitoringScreen>
                   },
                 ),
               ),
-              const SizedBox(height: 12),
             ],
           );
         },

@@ -263,7 +263,7 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
                     builder: (_) => ProfileScreen(employeeData: widget.employeeData),
                   ));
                 }),
-                _buildShortcut("Performance", Icons.assessment, () {
+                _buildShortcut("My Rewards", Icons.assessment, () {
                   Navigator.push(context, MaterialPageRoute(
                     builder: (_) => UserPerformanceScreen(employeeName: name),
                   ));

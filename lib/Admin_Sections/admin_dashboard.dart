@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hrms_project/Admin_Sections/admin_notification.dart';
+import 'Adminweeklywatchsheet.dart';
 import 'EmployeeListPage.dart';
 import 'admin _Attandencemonitor.dart';
 import 'admin_holidaycalender.dart';
@@ -35,7 +36,7 @@ class DashboardScreen extends StatelessWidget {
     {"icon": Icons.insert_chart, "label": "Leave Management"},
     {"icon": Icons.access_time, "label": "TimeSheets"},
     {"icon": Icons.calendar_today, "label": "Holiday Calendar"},
-    {"icon": Icons.folder, "label": "Performance Review"},
+    {"icon": Icons.folder, "label": "Employee Review"},
   ];
 
   @override
@@ -77,7 +78,7 @@ class DashboardScreen extends StatelessWidget {
                       try {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => AdminNotification()),
+                          MaterialPageRoute(builder: (context) => AdminNotificationScreen ()),
                         );
                       } catch (e) {
                         print('Error navigating to AdminNotification: $e');
@@ -119,14 +120,14 @@ class DashboardScreen extends StatelessWidget {
                           } else if (item["label"] == "TimeSheets") {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (context) => TimeSheetsPage()),
+                              MaterialPageRoute(builder: (context) => TimesheetPagee()),
                             );
                           } else if (item["label"] == "Holiday Calendar") {
                             Navigator.push(
                               context,
                               MaterialPageRoute(builder: (context) => HolidayCalendarAdminScreen()),
                             );
-                          } else if (item["label"] == "Performance Review") {
+                          } else if (item["label"] == "Employee Review") {
                             Navigator.push(
                               context,
                               MaterialPageRoute(builder: (context) => AddPerformanceReviewScreen()),

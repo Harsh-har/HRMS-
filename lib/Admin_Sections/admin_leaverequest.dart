@@ -1,3 +1,4 @@
+// ✅ Full Updated LeaveRequestsPage
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -36,11 +37,7 @@ class _LeaveRequestsPageState extends State<LeaveRequestsPage>
           labelColor: Colors.blue,
           unselectedLabelColor: Colors.grey,
           indicatorColor: Colors.blue,
-          tabs: [
-            Tab(text: 'Pending'),
-            Tab(text: 'Approved'),
-            Tab(text: 'Rejected'),
-          ],
+          tabs: _statuses.map((status) => Tab(text: status)).toList(),
         ),
       ),
       body: Column(
@@ -59,9 +56,7 @@ class _LeaveRequestsPageState extends State<LeaveRequestsPage>
           Expanded(
             child: TabBarView(
               controller: _tabController,
-              children: _statuses.map((status) {
-                return _buildLeaveList(status);
-              }).toList(),
+              children: _statuses.map((status) => _buildLeaveList(status)).toList(),
             ),
           ),
         ],
@@ -118,16 +113,14 @@ class _LeaveRequestsPageState extends State<LeaveRequestsPage>
             children: [
               CircleAvatar(
                 radius: 26,
-                backgroundImage:
-                NetworkImage(data['image'] ?? 'https://via.placeholder.com/150'),
+                backgroundImage: NetworkImage(data['image'] ?? 'https://via.placeholder.com/150'),
               ),
               SizedBox(width: 12),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(data['employeeName'] ?? '', style: TextStyle(fontWeight: FontWeight.bold)),
                   SizedBox(height: 4),
-                  Text('ID: ${data['employeeId'] ?? 'N/A'}',
-                      style: TextStyle(color: Colors.grey[700])),
+                  Text('ID: ${data['employeeId'] ?? 'N/A'}', style: TextStyle(color: Colors.grey[700])),
                 ]),
               ),
               Container(
@@ -136,38 +129,57 @@ class _LeaveRequestsPageState extends State<LeaveRequestsPage>
                   color: (data['leaveType'] == 'Sick Leave') ? Colors.green[100] : Colors.blue[100],
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Text(data['leaveType'] ?? '',
-                    style: TextStyle(
-                        fontSize: 12,
-                        color: (data['leaveType'] == 'Sick Leave')
-                            ? Colors.green[800]
-                            : Colors.blue[800])),
+                child: Text(
+                  data['leaveType'] ?? '',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: (data['leaveType'] == 'Sick Leave') ? Colors.green[800] : Colors.blue[800],
+                  ),
+                ),
               ),
             ],
           ),
           SizedBox(height: 12),
-
           _info("Start Date", data['startDate']),
           _info("End Date", data['endDate']),
           _info("Half Day", data['isHalfDay'] == true ? 'Yes' : 'No'),
           _info("Reason", data['reason']),
           SizedBox(height: 12),
-
           if (data['status'] == 'Pending')
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _button("APPROVE", Colors.green, () {
-                  FirebaseFirestore.instance
+                _button("APPROVE", Colors.green, () async {
+                  await FirebaseFirestore.instance
                       .collection('leave_requests')
                       .doc(docId)
                       .update({'status': 'Approved'});
+
+                  await FirebaseFirestore.instance.collection('notifications').add({
+                    'title': 'Leave Request Approved',
+                    'message': '${data['employeeName']}\'s leave from ${data['startDate']} to ${data['endDate']} has been approved.',
+                    'type': 'leave',
+                    'read': false,
+                    'timestamp': Timestamp.now(),
+                    'action': 'view_leave',
+                    'employeeId': data['employeeId'],
+                  });
                 }),
-                _button("REJECT", Colors.red, () {
-                  FirebaseFirestore.instance
+                _button("REJECT", Colors.red, () async {
+                  await FirebaseFirestore.instance
                       .collection('leave_requests')
                       .doc(docId)
                       .update({'status': 'Rejected'});
+
+                  await FirebaseFirestore.instance.collection('notifications').add({
+                    'title': 'Leave Request Rejected',
+                    'message': '${data['employeeName']}\'s leave from ${data['startDate']} to ${data['endDate']} has been rejected.',
+                    'type': 'leave',
+                    'read': false,
+                    'timestamp': Timestamp.now(),
+                    'action': 'view_leave',
+                    'employeeId': data['employeeId'],
+                  });
                 }),
               ],
             ),

@@ -19,12 +19,12 @@ class _WeeklyTimesheetScreenState extends State<WeeklyTimesheetScreen> {
   final List<List<TextEditingController>> _breakControllers = List.generate(
       5,
           (_) => List.generate(7, (_) => TextEditingController(text: '0'),
-          ));
+      ));
 
       final List<List<TextEditingController>> _controllers = List.generate(
       5,
           (_) => List.generate(7, (_) => TextEditingController(text: '0'),
-          ));
+      ));
 
       List<String?> selectedProjects = List.filled(5, null);
   List<String> projectList = [
@@ -67,10 +67,14 @@ class _WeeklyTimesheetScreenState extends State<WeeklyTimesheetScreen> {
     final weekStart = selectedDate!.subtract(Duration(days: selectedDate!.weekday - 1));
     final weekStartFormatted = DateFormat('yyyy-MM-dd').format(weekStart);
 
-    // Query Firestore for a timesheet for this employee and week.
-    final querySnapshot = await FirebaseFirestore.instance
+    // Get reference to the employee's timesheets collection
+    final employeeTimesheetsRef = FirebaseFirestore.instance
         .collection('weekly_timesheets')
-        .where('employeeId', isEqualTo: widget.employeeData!['employeeId'])
+        .doc(widget.employeeData!['name']) // Using employee name as document ID
+        .collection('timesheets');
+
+    // Query for timesheet with this week start date
+    final querySnapshot = await employeeTimesheetsRef
         .where('weekStart', isEqualTo: weekStartFormatted)
         .limit(1)
         .get();
@@ -215,20 +219,24 @@ class _WeeklyTimesheetScreenState extends State<WeeklyTimesheetScreen> {
       'totalBreak': totalBreakTime,
       'status': submit ? 'Submitted' : _status,
       'timestamp': FieldValue.serverTimestamp(),
-      if (widget.employeeData != null) ...{
-        'employeeId': widget.employeeData!['employeeId'],
-        'employeeName': widget.employeeData!['name'],
-      }
+      'employeeId': widget.employeeData!['employeeId'],
+      'employeeName': widget.employeeData!['name'],
     };
 
     try {
+      // Get reference to the employee's timesheets collection
+      final employeeTimesheetsRef = FirebaseFirestore.instance
+          .collection('weekly_timesheets')
+          .doc(widget.employeeData!['name']) // Using employee name as document ID
+          .collection('timesheets');
+
       if (timesheetDocId != null) {
         // Update existing document
-        await FirebaseFirestore.instance.collection('weekly_timesheets').doc(timesheetDocId).update(timesheetData);
+        await employeeTimesheetsRef.doc(timesheetDocId).update(timesheetData);
       } else {
-        // Create new document
-        final docRef = await FirebaseFirestore.instance.collection('weekly_timesheets').add(timesheetData);
-        timesheetDocId = docRef.id;
+        // Create new document with weekStart as document ID
+        final docRef = await employeeTimesheetsRef.doc(weekStartFormatted).set(timesheetData);
+        timesheetDocId = weekStartFormatted;
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
