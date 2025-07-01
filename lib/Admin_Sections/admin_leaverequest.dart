@@ -1,4 +1,3 @@
-// ✅ Full Updated LeaveRequestsPage
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -108,84 +107,103 @@ class _LeaveRequestsPageState extends State<LeaveRequestsPage>
       elevation: 3,
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 26,
-                backgroundImage: NetworkImage(data['image'] ?? 'https://via.placeholder.com/150'),
-              ),
-              SizedBox(width: 12),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(data['employeeName'] ?? '', style: TextStyle(fontWeight: FontWeight.bold)),
-                  SizedBox(height: 4),
-                  Text('ID: ${data['employeeId'] ?? 'N/A'}', style: TextStyle(color: Colors.grey[700])),
-                ]),
-              ),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: (data['leaveType'] == 'Sick Leave') ? Colors.green[100] : Colors.blue[100],
-                  borderRadius: BorderRadius.circular(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 26,
+                  backgroundImage: NetworkImage(
+                      data['image'] ?? 'https://via.placeholder.com/150'),
                 ),
-                child: Text(
-                  data['leaveType'] ?? '',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: (data['leaveType'] == 'Sick Leave') ? Colors.green[800] : Colors.blue[800],
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(data['employeeName'] ?? '',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        SizedBox(height: 4),
+                        Text('ID: ${data['employeeId'] ?? 'N/A'}',
+                            style: TextStyle(color: Colors.grey[700])),
+                      ]),
+                ),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: (data['leaveType'] == 'Sick Leave')
+                        ? Colors.green[100]
+                        : Colors.blue[100],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    data['leaveType'] ?? '',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: (data['leaveType'] == 'Sick Leave')
+                          ? Colors.green[800]
+                          : Colors.blue[800],
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          SizedBox(height: 12),
-          _info("Start Date", data['startDate']),
-          _info("End Date", data['endDate']),
-          _info("Half Day", data['isHalfDay'] == true ? 'Yes' : 'No'),
-          _info("Reason", data['reason']),
-          SizedBox(height: 12),
-          if (data['status'] == 'Pending')
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _button("APPROVE", Colors.green, () async {
-                  await FirebaseFirestore.instance
-                      .collection('leave_requests')
-                      .doc(docId)
-                      .update({'status': 'Approved'});
-
-                  await FirebaseFirestore.instance.collection('notifications').add({
-                    'title': 'Leave Request Approved',
-                    'message': '${data['employeeName']}\'s leave from ${data['startDate']} to ${data['endDate']} has been approved.',
-                    'type': 'leave',
-                    'read': false,
-                    'timestamp': Timestamp.now(),
-                    'action': 'view_leave',
-                    'employeeId': data['employeeId'],
-                  });
-                }),
-                _button("REJECT", Colors.red, () async {
-                  await FirebaseFirestore.instance
-                      .collection('leave_requests')
-                      .doc(docId)
-                      .update({'status': 'Rejected'});
-
-                  await FirebaseFirestore.instance.collection('notifications').add({
-                    'title': 'Leave Request Rejected',
-                    'message': '${data['employeeName']}\'s leave from ${data['startDate']} to ${data['endDate']} has been rejected.',
-                    'type': 'leave',
-                    'read': false,
-                    'timestamp': Timestamp.now(),
-                    'action': 'view_leave',
-                    'employeeId': data['employeeId'],
-                  });
-                }),
               ],
             ),
-        ]),
+            SizedBox(height: 12),
+            _info("Start Date", data['startDate']),
+            _info("End Date", data['endDate']),
+            _info("Half Day", data['isHalfDay'] == true ? 'Yes' : 'No'),
+            _info("Reason", data['reason']),
+            SizedBox(height: 12),
+            if (data['status'] == 'Pending')
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _button("APPROVE", Colors.green, () async {
+                    await _updateLeaveStatus(docId, data, 'Approved');
+                  }),
+                  _button("REJECT", Colors.red, () async {
+                    await _updateLeaveStatus(docId, data, 'Rejected');
+                  }),
+                ],
+              ),
+          ],
+        ),
       ),
     );
+  }
+
+  Future<void> _updateLeaveStatus(
+      String docId, Map<String, dynamic> data, String status) async {
+    final leaveRef =
+    FirebaseFirestore.instance.collection('leave_requests').doc(docId);
+    final notifRef = FirebaseFirestore.instance.collection('notifications');
+
+    try {
+      await leaveRef.update({
+        'status': status,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      await notifRef.add({
+        'title': 'Leave $status',
+        'message':
+        '${data['leaveType']} leave from ${data['startDate']} to ${data['endDate']} has been $status.',
+        'type': 'leave',
+        'read': false,
+        'employeeId': data['employeeId'],
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Leave $status successfully')),
+      );
+    } catch (e) {
+      print('Error updating leave: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: Could not update leave')),
+      );
+    }
   }
 
   Widget _info(String label, dynamic value) => Padding(
@@ -195,20 +213,23 @@ class _LeaveRequestsPageState extends State<LeaveRequestsPage>
       children: [
         Text("$label: ", style: TextStyle(fontWeight: FontWeight.bold)),
         Expanded(
-          child: Text(value?.toString() ?? '-', style: TextStyle(color: Colors.grey[800])),
+          child: Text(value?.toString() ?? '-',
+              style: TextStyle(color: Colors.grey[800])),
         ),
       ],
     ),
   );
 
-  Widget _button(String text, Color color, VoidCallback onTap) => ElevatedButton(
-    onPressed: onTap,
-    style: ElevatedButton.styleFrom(
-      backgroundColor: color.withOpacity(0.1),
-      foregroundColor: color.withOpacity(0.8),
-      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-    ),
-    child: Text(text),
-  );
+  Widget _button(String text, Color color, VoidCallback onTap) =>
+      ElevatedButton(
+        onPressed: onTap,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color.withOpacity(0.1),
+          foregroundColor: color.withOpacity(0.8),
+          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+          shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+        child: Text(text),
+      );
 }

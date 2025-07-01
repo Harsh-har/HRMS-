@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hrms_project/Admin_Sections/admin_notification.dart';
 import 'Adminweeklywatchsheet.dart';
 import 'EmployeeListPage.dart';
@@ -30,6 +31,12 @@ class EmployeeApp extends StatelessWidget {
 }
 
 class DashboardScreen extends StatelessWidget {
+  final Stream<int> _unreadNotificationCount = FirebaseFirestore.instance
+      .collection('notifications')
+      .where('status', isEqualTo: 'unread')
+      .snapshots()
+      .map((snapshot) => snapshot.docs.length);
+
   final List<Map<String, dynamic>> gridItems = [
     {"icon": Icons.group, "label": "Employee Management"},
     {"icon": Icons.event_note, "label": "Attendance Monitoring"},
@@ -72,20 +79,47 @@ class DashboardScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  IconButton(
-                    icon: Icon(Icons.notifications),
-                    onPressed: () {
-                      try {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => AdminNotificationScreen ()),
-                        );
-                      } catch (e) {
-                        print('Error navigating to AdminNotification: $e');
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Failed to open notifications: $e'), backgroundColor: Colors.red),
-                        );
-                      }
+                  StreamBuilder<int>(
+                    stream: _unreadNotificationCount,
+                    builder: (context, snapshot) {
+                      int unreadCount = snapshot.data ?? 0;
+
+                      return Stack(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.notifications),
+                            onPressed: () {
+                              try {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => const AdminNotificationScreen()),
+                                );
+                              } catch (e) {
+                                print('Error navigating to AdminNotification: $e');
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Failed to open notifications: $e'), backgroundColor: Colors.red),
+                                );
+                              }
+                            },
+                          ),
+                          if (unreadCount > 0)
+                            Positioned(
+                              right: 11,
+                              top: 11,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                                constraints: const BoxConstraints(
+                                  minWidth: 8,
+                                  minHeight: 8,
+                                ),
+                              ),
+                            ),
+                        ],
+                      );
                     },
                   ),
                 ],

@@ -9,9 +9,9 @@ class AdminNotificationScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Notifications"),
+        title: const Text("Admin Notifications"),
         backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        foregroundColor: Colors.black87,
         elevation: 1,
       ),
       body: StreamBuilder<QuerySnapshot>(
@@ -20,44 +20,37 @@ class AdminNotificationScreen extends StatelessWidget {
             .orderBy('timestamp', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting)
-            return Center(child: CircularProgressIndicator());
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
 
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty)
-            return Center(child: Text("No notifications found."));
+          final notifications = snapshot.data!.docs;
 
-          final docs = snapshot.data!.docs;
+          if (notifications.isEmpty) {
+            return const Center(child: Text("No notifications"));
+          }
 
           return ListView.builder(
-            padding: EdgeInsets.all(12),
-            itemCount: docs.length,
+            itemCount: notifications.length,
             itemBuilder: (context, index) {
-              final data = docs[index].data() as Map<String, dynamic>;
-              final isUnread = !(data['read'] ?? false);
-              final timestamp = data['timestamp'] as Timestamp?;
+              final doc = notifications[index];
+              final data = doc.data() as Map<String, dynamic>;
 
-              return ListTile(
-                contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                tileColor: isUnread ? Colors.blue[50] : Colors.grey[100],
-                title: Text(data['title'] ?? '', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(data['message'] ?? ''),
-                    if (timestamp != null)
-                      Text(
-                        DateFormat('MMM dd, yyyy – hh:mm a').format(timestamp.toDate()),
-                        style: TextStyle(fontSize: 12, color: Colors.grey[700]),
-                      ),
-                  ],
+              return Card(
+                child: ListTile(
+                  leading: const Icon(Icons.notifications),
+                  title: Text(data['message'] ?? 'No message'),
+                  subtitle: Text(
+                    data['timestamp'] != null
+                        ? DateFormat('dd MMM yyyy, hh:mm a').format((data['timestamp'] as Timestamp).toDate())
+                        : 'No date',
+                  ),
+                  trailing: data['status'] == 'unread'
+                      ? const Icon(Icons.circle, color: Colors.red, size: 10)
+                      : null,
+                  onTap: () {
+                    // Optional: mark as read
+                    doc.reference.update({'status': 'read'});
+                  },
                 ),
-                trailing: isUnread
-                    ? Icon(Icons.circle, color: Colors.blueAccent, size: 10)
-                    : null,
-                onTap: () async {
-                  // Mark as read when tapped
-                  await docs[index].reference.update({'read': true});
-                },
               );
             },
           );

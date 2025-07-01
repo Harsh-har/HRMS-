@@ -5,6 +5,10 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../Admin_Sections/admin_dashboard.dart';
+import 'EmployeeDashboard.dart';
+// ✅ Replace with actual path to your dashboard
+
 class UserTimesheetScreen extends StatefulWidget {
   final Map<String, dynamic> employeeData;
   const UserTimesheetScreen({super.key, required this.employeeData});
@@ -29,7 +33,6 @@ class _UserTimesheetScreenState extends State<UserTimesheetScreen> {
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
     final startOfMonth = DateTime(now.year, now.month, 1);
     final endOfMonth = DateTime(now.year, now.month + 1, 0);
-
     final days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     List<Map<String, String>> records = [];
 
@@ -148,7 +151,6 @@ class _UserTimesheetScreenState extends State<UserTimesheetScreen> {
 
   void exportToPdf() async {
     final pdf = pw.Document();
-
     pdf.addPage(
       pw.Page(
         build: (pw.Context context) => pw.Column(
@@ -199,96 +201,114 @@ class _UserTimesheetScreenState extends State<UserTimesheetScreen> {
     );
   }
 
+  void goBackToDashboard() {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => EmployeeDashboard(employeeData: widget.employeeData)),
+          (route) => false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('My Timesheet'),
-        backgroundColor: Color(0xFF0D47A1),
-        actions: [
-          PopupMenuButton<String>(
-            onSelected: (val) {
-              setState(() {
-                selectedFilter = val;
-                _fetchTimesheet();
-              });
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(value: 'This Week', child: Text('This Week')),
-              PopupMenuItem(value: 'This Month', child: Text('This Month')),
-            ],
+    return WillPopScope(
+      onWillPop: () async {
+        goBackToDashboard();
+        return false;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('My Timesheet'),
+          backgroundColor: Color(0xFF0D47A1),
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back),
+            onPressed: goBackToDashboard,
           ),
-          IconButton(
-            onPressed: exportToPdf,
-            icon: Icon(Icons.picture_as_pdf),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Container(
-            margin: EdgeInsets.all(16),
-            padding: EdgeInsets.symmetric(vertical: 16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF0D47A1), Color(0xFF1976D2)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildSummary("Worked", getTotalHours(), Icons.access_time),
-                _buildSummary("Present", getDaysWorked(), Icons.check_circle),
-                _buildSummary("Leave", getLeavesCount(), Icons.close),
+          actions: [
+            PopupMenuButton<String>(
+              onSelected: (val) {
+                setState(() {
+                  selectedFilter = val;
+                  _fetchTimesheet();
+                });
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(value: 'This Week', child: Text('This Week')),
+                PopupMenuItem(value: 'This Month', child: Text('This Month')),
               ],
             ),
-          ),
-          Expanded(
-            child: timesheet.isEmpty
-                ? Center(child: CircularProgressIndicator())
-                : ListView.builder(
-              itemCount: timesheet.length,
-              itemBuilder: (context, index) {
-                final day = timesheet[index];
-                return GestureDetector(
-                  onTap: () => showDetailDialog(day),
-                  child: Card(
-                    margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    child: ListTile(
-                      leading: Icon(Icons.calendar_today, color: Colors.blueAccent),
-                      title: Text(day['date']!),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text("Check-In: ${day['checkIn']}  |  Check-Out: ${day['checkOut']}", maxLines: 1),
-                          Text("Hours: ${day['totalWorkedHours']}", maxLines: 1),
-                        ],
-                      ),
-                      trailing: Chip(
-                        label: Text(
-                          day['status']!,
-                          style: TextStyle(
-                            color: day['status'] == 'Absent'
-                                ? Colors.red
-                                : day['status'] == 'Late'
-                                ? Colors.orange
-                                : Colors.green,
-                          ),
+            IconButton(
+              onPressed: exportToPdf,
+              icon: Icon(Icons.picture_as_pdf),
+            ),
+          ],
+        ),
+        body: Column(
+          children: [
+            Container(
+              margin: EdgeInsets.all(16),
+              padding: EdgeInsets.symmetric(vertical: 16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF0D47A1), Color(0xFF1976D2)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildSummary("Worked", getTotalHours(), Icons.access_time),
+                  _buildSummary("Present", getDaysWorked(), Icons.check_circle),
+                  _buildSummary("Leave", getLeavesCount(), Icons.close),
+                ],
+              ),
+            ),
+            Expanded(
+              child: timesheet.isEmpty
+                  ? Center(child: CircularProgressIndicator())
+                  : ListView.builder(
+                itemCount: timesheet.length,
+                itemBuilder: (context, index) {
+                  final day = timesheet[index];
+                  return GestureDetector(
+                    onTap: () => showDetailDialog(day),
+                    child: Card(
+                      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      child: ListTile(
+                        leading: Icon(Icons.calendar_today, color: Colors.blueAccent),
+                        title: Text(day['date']!),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("Check-In: ${day['checkIn']}  |  Check-Out: ${day['checkOut']}", maxLines: 1),
+                            Text("Hours: ${day['totalWorkedHours']}", maxLines: 1),
+                          ],
                         ),
-                        backgroundColor: Colors.grey.shade100,
+                        trailing: Chip(
+                          label: Text(
+                            day['status']!,
+                            style: TextStyle(
+                              color: day['status'] == 'Absent'
+                                  ? Colors.red
+                                  : day['status'] == 'Late'
+                                  ? Colors.orange
+                                  : Colors.green,
+                            ),
+                          ),
+                          backgroundColor: Colors.grey.shade100,
+                        ),
                       ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -77,7 +77,7 @@ class _SubmitLeaveRequestPageState extends State<SubmitLeaveRequestPage> {
     }
   }
 
-  void _submitRequest() async {
+  Future<void> _submitRequest() async {
     if (_leaveType == null || _startDate == null || _endDate == null || _reasonController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please complete all fields")),
@@ -85,6 +85,7 @@ class _SubmitLeaveRequestPageState extends State<SubmitLeaveRequestPage> {
       return;
     }
 
+    // Upload file if attached
     if (_pickedFile != null) {
       final ref = FirebaseStorage.instance
           .ref()
@@ -106,7 +107,19 @@ class _SubmitLeaveRequestPageState extends State<SubmitLeaveRequestPage> {
       'timestamp': FieldValue.serverTimestamp(),
     };
 
+    // Save leave request
     await FirebaseFirestore.instance.collection('leave_requests').add(leaveData);
+
+    // ✅ Save admin notification
+    await FirebaseFirestore.instance.collection('notifications').add({
+      'type': 'leave_request',
+      'message':
+      '${widget.employeeData['name']} requested $_leaveType leave from ${DateFormat('dd MMM yyyy').format(_startDate!)} to ${DateFormat('dd MMM yyyy').format(_endDate!)}',
+      'timestamp': FieldValue.serverTimestamp(),
+      'employeeId': widget.employeeData['employeeId'],
+      'employeeName': widget.employeeData['name'],
+      'status': 'unread',
+    });
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text("Leave request submitted")),
@@ -215,8 +228,10 @@ class _SubmitLeaveRequestPageState extends State<SubmitLeaveRequestPage> {
           children: [
             Align(
               alignment: Alignment.centerLeft,
-              child: Text("Employee ID: $employeeId",
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),),
+              child: Text(
+                "Employee ID: $employeeId",
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
             ),
             const SizedBox(height: 12),
             _buildForm(),

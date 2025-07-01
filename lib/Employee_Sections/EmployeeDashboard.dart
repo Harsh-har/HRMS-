@@ -1,3 +1,5 @@
+// Full Updated EmployeeDashboard.dart
+
 import 'package:flutter/material.dart';
 import 'package:hrms_project/Employee_Sections/userentrtimesheet.dart';
 import 'package:intl/intl.dart';
@@ -11,7 +13,6 @@ import 'ProfileScreen.dart';
 import 'UserPerformanceScreen.dart';
 import 'UserProjectScreen.dart';
 import 'UserTimesheetScreen.dart';
-
 
 class EmployeeDashboard extends StatefulWidget {
   final Map<String, dynamic> employeeData;
@@ -27,8 +28,8 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
   int _notificationCount = 0;
   List<Map<String, dynamic>> recentActivities = [];
   late StreamSubscription<QuerySnapshot> _leaveSubscription;
+  late StreamSubscription<QuerySnapshot> _notificationSubscription;
 
-  // 1. Added _greeting method
   String _greeting() {
     final hour = DateTime.now().hour;
     if (hour < 12) return "Good Morning";
@@ -36,9 +37,15 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
     return "Good Evening";
   }
 
-  // 2. Added _navigateTo method
   void _navigateTo(int index) {
-    Widget? destination;
+    if (index == 0) {
+      setState(() => _currentIndex = 0);
+      return;
+    }
+
+    setState(() => _currentIndex = index);
+
+    late Widget destination;
     switch (index) {
       case 1:
         destination = NewAttendanceScreen(employeeData: widget.employeeData);
@@ -47,27 +54,28 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
         destination = UserProjectScreen(employeeData: widget.employeeData);
         break;
       case 3:
-        destination = WeeklyTimesheetScreen(employeeData: widget.employeeData,);
+        destination = WeeklyTimesheetScreen(employeeData: widget.employeeData);
         break;
+      default:
+        return;
     }
 
-    if (destination != null) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => destination!));
-      setState(() => _currentIndex = index);
-    }
+    Navigator.push(context, MaterialPageRoute(builder: (_) => destination));
   }
 
   @override
   void initState() {
     super.initState();
     _loadInitialData();
-    _setupLeaveListener();
+    _setupLeaveListener(); // fixed here
+    _setupNotificationListener();
     _checkNotifications();
   }
 
   @override
   void dispose() {
     _leaveSubscription.cancel();
+    _notificationSubscription.cancel();
     super.dispose();
   }
 
@@ -78,33 +86,48 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
         .where('read', isEqualTo: false)
         .get();
 
-    setState(() {
-      _notificationCount = snapshot.size;
-    });
+    setState(() => _notificationCount = snapshot.size);
   }
 
+  // ✅ Updated to listen to ALL leave_requests for this employee
   void _setupLeaveListener() {
     _leaveSubscription = FirebaseFirestore.instance
         .collection('leave_requests')
         .where('employeeId', isEqualTo: widget.employeeData['employeeId'])
-        .where('status', whereIn: ['Approved', 'Rejected'])
         .orderBy('timestamp', descending: true)
         .snapshots()
         .listen((snapshot) {
-      _processLeaveActivities(snapshot.docs);
+      final filteredDocs = snapshot.docs.where((doc) {
+        final status = doc['status'];
+        return status == 'Approved' || status == 'Rejected';
+      }).toList();
+
+      _processLeaveActivities(filteredDocs);
     });
+  }
+
+  void _setupNotificationListener() {
+    _notificationSubscription = FirebaseFirestore.instance
+        .collection('notifications')
+        .where('employeeId', isEqualTo: widget.employeeData['employeeId'])
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .listen((_) => _checkNotifications());
   }
 
   Future<void> _loadInitialData() async {
     final leaveSnapshot = await FirebaseFirestore.instance
         .collection('leave_requests')
         .where('employeeId', isEqualTo: widget.employeeData['employeeId'])
-        .where('status', whereIn: ['Approved', 'Rejected'])
         .orderBy('timestamp', descending: true)
-        .limit(3)
         .get();
 
-    _processLeaveActivities(leaveSnapshot.docs);
+    final filtered = leaveSnapshot.docs.where((doc) {
+      final status = doc['status'];
+      return status == 'Approved' || status == 'Rejected';
+    }).toList();
+
+    _processLeaveActivities(filtered);
 
     if (recentActivities.isEmpty) {
       final holidaySnapshot = await FirebaseFirestore.instance
@@ -114,17 +137,16 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
           .get();
 
       for (var doc in holidaySnapshot.docs) {
-        final data = doc.data();
-        final date = data['date'];
-        final formattedDate = date is Timestamp
-            ? DateFormat('dd MMM yyyy').format(date.toDate())
-            : date.toString();
+        final data = doc.data() as Map<String, dynamic>;
+        final date = data['date'] is Timestamp
+            ? DateFormat('dd MMM yyyy').format(data['date'].toDate())
+            : data['date'].toString();
 
         setState(() {
           recentActivities.add({
             'type': 'Holiday',
             'description': data['name'] ?? 'Holiday',
-            'date': formattedDate,
+            'date': date,
           });
         });
       }
@@ -135,31 +157,34 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
     List<Map<String, dynamic>> temp = [];
 
     for (var doc in docs) {
-      final data = doc.data() as Map<String, dynamic>;
-      final status = data['status'] ?? '';
-      final start = data['startDate'] ?? '';
-      final end = data['endDate'] ?? '';
-      final leaveType = data['leaveType'] ?? 'Leave';
-      final timestamp = data['timestamp'];
+      try {
+        final data = doc.data() as Map<String, dynamic>;
 
-      String date;
-      if (timestamp is Timestamp) {
-        date = DateFormat('dd MMM yyyy').format(timestamp.toDate());
-      } else {
-        date = 'N/A';
+        final status = data['status']?.toString() ?? '';
+        final start = data['startDate']?.toString() ?? '';
+        final end = data['endDate']?.toString() ?? '';
+        final leaveType = data['leaveType']?.toString() ?? 'Leave';
+
+        final timestamp = data['timestamp'] is Timestamp
+            ? (data['timestamp'] as Timestamp).toDate()
+            : DateTime.now();
+
+        final date = DateFormat('dd MMM yyyy').format(timestamp);
+
+        temp.add({
+          'type': 'Leave $status',
+          'description': '$leaveType from $start to $end',
+          'date': date,
+          'status': status,
+          'timestamp': timestamp,
+        });
+      } catch (e) {
+        print('Error processing document ${doc.id}: $e');
       }
-
-      temp.add({
-        'type': 'Leave $status',
-        'description': '$leaveType from $start to $end',
-        'date': date,
-        'status': status,
-      });
     }
 
-    setState(() {
-      recentActivities = temp.take(3).toList();
-    });
+    temp.sort((a, b) => (b['timestamp'] as DateTime).compareTo(a['timestamp'] as DateTime));
+    setState(() => recentActivities = temp.take(3).toList());
   }
 
   Widget _buildShortcut(String label, IconData icon, VoidCallback onTap) {
@@ -203,13 +228,14 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
             children: [
               IconButton(
                 icon: const Icon(Icons.notifications),
-                onPressed: () {
-                  Navigator.push(
+                onPressed: () async {
+                  await Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => NotificationScreen(employeeId: widget.employeeData['employeeId']),
+                      builder: (context) => Notificationscreen(employeeData: widget.employeeData),
                     ),
-                  ).then((_) => _checkNotifications());
+                  );
+                  _checkNotifications();
                 },
               ),
               if (_notificationCount > 0)
@@ -238,94 +264,104 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            GridView.count(
-              crossAxisCount: 3,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              children: [
-                _buildShortcut("Holiday\nCalendar", Icons.event, () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => HolidayCalendarUserScreen()));
-                }),
-                _buildShortcut("Submit\nLeave", Icons.send, () {
-                  Navigator.push(context, MaterialPageRoute(
-                    builder: (_) => SubmitLeaveRequestPage(employeeData: widget.employeeData),
-                  ));
-                }),
-                _buildShortcut("Profile", Icons.person, () {
-                  Navigator.push(context, MaterialPageRoute(
-                    builder: (_) => ProfileScreen(employeeData: widget.employeeData),
-                  ));
-                }),
-                _buildShortcut("My Rewards", Icons.assessment, () {
-                  Navigator.push(context, MaterialPageRoute(
-                    builder: (_) => UserPerformanceScreen(employeeName: name),
-                  ));
-                }),
-                _buildShortcut("My Timesheet", Icons.schedule, () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) =>UserTimesheetScreen (employeeData: widget.employeeData),
-                    ),
-                  );
-                }),
-                _buildShortcut("Projects", Icons.folder, () {
-                  Navigator.push(context, MaterialPageRoute(
-                    builder: (_) => UserProjectScreen(employeeData: widget.employeeData),
-                  ));
-                }),
-              ],
-            ),
-            const SizedBox(height: 30),
-            const Text("Recent Activities", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            if (recentActivities.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Text("No recent activities found"),
-              )
-            else
-              Column(
-                children: recentActivities.map((activity) {
-                  Color statusColor = Colors.grey;
-                  IconData statusIcon = Icons.info;
-
-                  if (activity['type'].contains('Approved')) {
-                    statusColor = Colors.green;
-                    statusIcon = Icons.check_circle;
-                  } else if (activity['type'].contains('Rejected')) {
-                    statusColor = Colors.red;
-                    statusIcon = Icons.cancel;
-                  } else if (activity['type'].contains('Holiday')) {
-                    statusColor = Colors.orange;
-                    statusIcon = Icons.celebration;
-                  }
-
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      leading: Icon(statusIcon, color: statusColor),
-                      title: Text(
-                        activity['type'],
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: statusColor,
-                        ),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await _loadInitialData();
+          await _checkNotifications();
+        },
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              GridView.count(
+                crossAxisCount: 3,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  _buildShortcut("Holiday\nCalendar", Icons.event, () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => HolidayCalendarUserScreen()));
+                  }),
+                  _buildShortcut("Submit\nLeave", Icons.send, () {
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => SubmitLeaveRequestPage(employeeData: widget.employeeData),
+                    ));
+                  }),
+                  _buildShortcut("Profile", Icons.person, () {
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => ProfileScreen(employeeData: widget.employeeData),
+                    ));
+                  }),
+                  _buildShortcut("My Rewards", Icons.assessment, () {
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => UserPerformanceScreen(employeeName: name),
+                    ));
+                  }),
+                  _buildShortcut("My Timesheet", Icons.schedule, () {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => UserTimesheetScreen(employeeData: widget.employeeData),
                       ),
-                      subtitle: Text(activity['description']),
-                      trailing: Text(activity['date'], style: const TextStyle(color: Colors.grey)),
-                    ),
-                  );
-                }).toList(),
+                    );
+                  }),
+                  _buildShortcut("Projects", Icons.folder, () {
+                    Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => UserProjectScreen(employeeData: widget.employeeData),
+                    ));
+                  }),
+                ],
               ),
-          ],
+              const SizedBox(height: 30),
+              const Text("Recent Activities", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
+              if (recentActivities.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Text("No recent activities found"),
+                )
+              else
+                Column(
+                  children: recentActivities.map((activity) {
+                    Color statusColor = Colors.grey;
+                    IconData statusIcon = Icons.info;
+                    String title = activity['type'];
+
+                    if (activity['type'].contains('Approved')) {
+                      statusColor = Colors.green;
+                      statusIcon = Icons.check_circle;
+                      title = 'Leave Approved';
+                    } else if (activity['type'].contains('Rejected')) {
+                      statusColor = Colors.red;
+                      statusIcon = Icons.cancel;
+                      title = 'Leave Rejected';
+                    } else if (activity['type'].contains('Holiday')) {
+                      statusColor = Colors.orange;
+                      statusIcon = Icons.celebration;
+                    }
+
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        leading: Icon(statusIcon, color: statusColor),
+                        title: Text(
+                          title,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: statusColor,
+                          ),
+                        ),
+                        subtitle: Text(activity['description']),
+                        trailing: Text(activity['date'], style: const TextStyle(color: Colors.grey)),
+                      ),
+                    );
+                  }).toList(),
+                ),
+            ],
+          ),
         ),
       ),
       bottomNavigationBar: BottomNavigationBar(

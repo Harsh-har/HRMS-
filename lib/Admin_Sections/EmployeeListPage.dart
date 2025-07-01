@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../Employee_Sections/UserTimesheetScreen.dart';
 import 'emp_managment.dart';
 
-
 class EmployeeListPage extends StatefulWidget {
   const EmployeeListPage({Key? key}) : super(key: key);
 
@@ -34,7 +33,7 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
       final data = employee.data() as Map<String, dynamic>;
       final name = data['name']?.toString().toLowerCase() ?? '';
       final designation = data['designation']?.toString().toLowerCase() ?? '';
-      final id = data['id']?.toString().toLowerCase() ?? '';
+      final id = data['employeeId']?.toString().toLowerCase() ?? '';
       final email = data['email']?.toString().toLowerCase() ?? '';
       return name.contains(query.toLowerCase()) ||
           designation.contains(query.toLowerCase()) ||
@@ -52,7 +51,6 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // Navigate to Add Employee Page
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -102,11 +100,12 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
                 return ListView.builder(
                   itemCount: filteredEmployees.length,
                   itemBuilder: (context, index) {
-                    final data =
-                    filteredEmployees[index].data() as Map<String, dynamic>;
+                    final data = filteredEmployees[index].data()
+                    as Map<String, dynamic>;
 
                     return Card(
-                      margin: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      margin:
+                      EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       child: ListTile(
                         leading: CircleAvatar(
                           backgroundImage:
@@ -116,7 +115,7 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('ID: ${data['id'] ?? 'N/A'}'),
+                            Text('ID: ${data['employeeId'] ?? 'N/A'}'),
                             Text('Email: ${data['email'] ?? 'N/A'}'),
                             Text(data['designation'] ?? 'No Designation'),
                           ],
@@ -129,7 +128,7 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
                               builder: (context) => UserTimesheetScreen(
                                 employeeData: {
                                   'name': data['name'],
-                                  'id': data['id'],
+                                  'employeeId': data['employeeId'],
                                   'email': data['email'],
                                   'profileImage': data['profileImage'],
                                   'designation': data['designation'],
