@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:hrms_project/Admin_Sections/EmployeeDetailsView.dart';
 
-import '../Employee_Sections/UserTimesheetScreen.dart';
+import '../Employee_Sections/ProfileScreen.dart';
 import 'emp_managment.dart';
 
 class EmployeeListPage extends StatefulWidget {
@@ -100,8 +101,8 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
                 return ListView.builder(
                   itemCount: filteredEmployees.length,
                   itemBuilder: (context, index) {
-                    final data = filteredEmployees[index].data()
-                    as Map<String, dynamic>;
+                    final data =
+                    filteredEmployees[index].data() as Map<String, dynamic>;
 
                     return Card(
                       margin:
@@ -125,7 +126,7 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => UserTimesheetScreen(
+                              builder: (context) =>Employeedetailsview(
                                 employeeData: {
                                   'name': data['name'],
                                   'employeeId': data['employeeId'],
@@ -133,6 +134,7 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
                                   'profileImage': data['profileImage'],
                                   'designation': data['designation'],
                                 },
+
                               ),
                             ),
                           );

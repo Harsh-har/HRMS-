@@ -4,10 +4,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
-import '../Admin_Sections/admin_dashboard.dart';
 import 'EmployeeDashboard.dart';
-// ✅ Replace with actual path to your dashboard
 
 class UserTimesheetScreen extends StatefulWidget {
   final Map<String, dynamic> employeeData;
@@ -68,9 +65,9 @@ class _UserTimesheetScreenState extends State<UserTimesheetScreen> {
             String status = 'Absent';
             if (data['checkIn'] != null && data['checkOut'] != null) {
               final checkInTime = DateFormat('hh:mm a').parse(data['checkIn']);
-              status = checkInTime.hour > 9 || (checkInTime.hour == 9 && checkInTime.minute > 0)
-                  ? 'Late'
-                  : 'Present';
+              status = checkInTime.hour < 9 || (checkInTime.hour == 9 && checkInTime.minute > 0)
+                  ? 'Present'
+                  : 'Late';
             }
 
             records.add({

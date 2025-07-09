@@ -1,7 +1,13 @@
+import 'dart:io';
+import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+
+import 'package:path_provider/path_provider.dart';
+
 
 class HolidayCalendarAdminScreen extends StatefulWidget {
   @override
@@ -130,6 +136,36 @@ class _HolidayCalendarAdminScreenState extends State<HolidayCalendarAdminScreen>
     );
   }
 
+  Future<void> _exportToCSV() async {
+    List<List<String>> csvData = [
+      ['Date', 'Name', 'Type', 'Region', 'Notes'],
+      ...holidays.map((h) => [
+        h['date'] ?? '',
+        h['name'] ?? '',
+        h['type'] ?? '',
+        h['region'] ?? '',
+        h['notes'] ?? ''
+      ])
+    ];
+
+    String csv = const ListToCsvConverter().convert(csvData);
+
+    if (await Permission.storage.request().isGranted) {
+      final directory = await getExternalStorageDirectory();
+      final path = '${directory!.path}/holiday_calendar.csv';
+      final file = File(path);
+      await file.writeAsString(csv);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("CSV downloaded to: $path")),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Storage permission denied")),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -137,7 +173,7 @@ class _HolidayCalendarAdminScreenState extends State<HolidayCalendarAdminScreen>
         title: Text('Holiday Calendar'),
         actions: [
           IconButton(icon: Icon(Icons.filter_list), onPressed: () {}),
-          IconButton(icon: Icon(Icons.file_download), onPressed: () {}),
+          IconButton(icon: Icon(Icons.file_download), onPressed: _exportToCSV),
         ],
       ),
       body: Column(
@@ -194,7 +230,6 @@ class _HolidayCalendarAdminScreenState extends State<HolidayCalendarAdminScreen>
                           setState(() {
                             holidays.removeAt(index);
                           });
-                          // Optional: remove from Firestore if needed
                           QuerySnapshot snapshot = await FirebaseFirestore.instance
                               .collection('holidays')
                               .where('date', isEqualTo: holiday['date'])

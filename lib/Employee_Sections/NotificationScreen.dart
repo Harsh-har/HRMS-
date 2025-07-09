@@ -49,39 +49,79 @@ class _SeenStatusPageState extends State<Notificationscreen> {
         return ListView(
           children: [
             const SizedBox(height: 10),
-            const SizedBox(height: 12),
             ...leaves.map((doc) {
               final data = doc.data() as Map<String, dynamic>;
-              return Card(
-                margin: const EdgeInsets.only(bottom: 10),
-                child: ListTile(
-                  leading: Icon(
-                    Icons.event_note,
-                    color: data['status'] == 'Approved'
-                        ? Colors.green
-                        : data['status'] == 'Rejected'
-                        ? Colors.red
-                        : Colors.orange,
-                  ),
-                  title: Text("${data['leaveType']}"),
-                  subtitle: Text(
-                    "From ${data['startDate']} to ${data['endDate']}\nReason: ${data['reason']}",
-                    style: const TextStyle(fontSize: 13),
-                  ),
-                  trailing: Text(
-                    data['status'],
-                    style: TextStyle(
+              final docId = doc.id;
+
+              return Dismissible(
+                key: Key(docId),
+                direction: DismissDirection.endToStart,
+                background: Container(
+                  color: Colors.red,
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: const Icon(Icons.delete, color: Colors.white),
+                ),
+                confirmDismiss: (direction) async {
+                  return await showDialog(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text("Confirm Delete"),
+                      content: const Text("Are you sure you want to delete this notification?"),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(false),
+                          child: const Text("Cancel"),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(true),
+                          child: const Text("Delete"),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                onDismissed: (_) async {
+                  await FirebaseFirestore.instance
+                      .collection('leave_requests')
+                      .doc(docId)
+                      .delete();
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Notification deleted')),
+                  );
+                },
+                child: Card(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  child: ListTile(
+                    leading: Icon(
+                      Icons.event_note,
                       color: data['status'] == 'Approved'
                           ? Colors.green
                           : data['status'] == 'Rejected'
                           ? Colors.red
                           : Colors.orange,
-                      fontWeight: FontWeight.bold,
+                    ),
+                    title: Text(data['leaveType'] ?? 'Leave'),
+                    subtitle: Text(
+                      "From ${data['startDate']} to ${data['endDate']}\nReason: ${data['reason']}",
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                    trailing: Text(
+                      data['status'] ?? '',
+                      style: TextStyle(
+                        color: data['status'] == 'Approved'
+                            ? Colors.green
+                            : data['status'] == 'Rejected'
+                            ? Colors.red
+                            : Colors.orange,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
               );
-            }),
+            }).toList(),
           ],
         );
       },

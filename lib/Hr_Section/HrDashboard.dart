@@ -2,19 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hrms_project/Admin_Sections/admin_notification.dart';
-import 'Adminweeklywatchsheet.dart';
-import 'EmployeeListPage.dart';
-import 'admin _Attandencemonitor.dart';
-import 'admin_holidaycalender.dart';
-import 'admin_performance.dart';
-import 'admin_profile.dart';
-import 'admin_projectswatch.dart';
-import 'admin_setting.dart';
-import 'admin_leaverequest.dart';
+import '../Admin_Sections/Adminweeklywatchsheet.dart';
+import '../Admin_Sections/EmployeeListPage.dart';
+import '../Admin_Sections/admin _Attandencemonitor.dart';
+import '../Admin_Sections/admin_holidaycalender.dart';
+import '../Admin_Sections/admin_leaverequest.dart';
+import '../Admin_Sections/admin_performance.dart';
+import '../Admin_Sections/admin_profile.dart';
+import '../Admin_Sections/admin_projectswatch.dart';
+import '../Admin_Sections/admin_setting.dart';
 
-void main() => runApp(AdminDashboard());
 
-class AdminDashboard extends StatelessWidget {
+void main() => runApp( HrDashboard());
+
+class  HrDashboard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
