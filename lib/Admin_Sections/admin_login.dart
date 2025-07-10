@@ -3,19 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../Employee_Sections/EmployeeDashboard.dart';
 import '../Admin_Sections/admin_dashboard.dart';
 import '../Hr_Section/HrDashboard.dart';
-
-class TeamManagerDashboard extends StatelessWidget {
-  final Map<String, dynamic> employeeData;
-  const TeamManagerDashboard({super.key, required this.employeeData});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Team Manager Dashboard')),
-      body: Center(child: Text('Welcome Manager: ${employeeData['name']}')),
-    );
-  }
-}
+import '../Manager_Section/ManagerDashboar.dart';
+// ✅ Fix typo here
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -71,7 +60,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         );
         return;
       }
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => AdminDashboard()));
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) =>  AdminDashboard()));
       return;
     }
 
@@ -115,17 +104,19 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         return;
       }
 
+      // ✅ Role-based routing
       Widget nextScreen;
       switch (role) {
-        case 'superadmin':
+        case 'admin':
           nextScreen = AdminDashboard();
           break;
         case 'hr':
           nextScreen = HrDashboard();
           break;
+        case 'manager':
         case 'teammanager':
         case 'projectmanager':
-          nextScreen = TeamManagerDashboard(employeeData: userData);
+          nextScreen = ManagerDashboard(role: role); // ✅ Pass role
           break;
         default:
           nextScreen = EmployeeDashboard(employeeData: userData);

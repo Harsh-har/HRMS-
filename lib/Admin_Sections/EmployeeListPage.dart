@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hrms_project/Admin_Sections/EmployeeDetailsView.dart';
+import 'package:hrms_project/Admin_Sections/role_permission.dart';
+
 import 'emp_managment.dart'; // Assuming this is where EmployeeForm is
 
 class EmployeeListPage extends StatefulWidget {
@@ -30,11 +32,11 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
     return employees.where((employee) {
       final data = employee.data() as Map<String, dynamic>;
       final name = data['name']?.toString().toLowerCase() ?? '';
-      final designation = data['designation']?.toString().toLowerCase() ?? '';
+      final department = data['department']?.toString().toLowerCase() ?? '';
       final id = data['employeeId']?.toString().toLowerCase() ?? '';
       final email = data['email']?.toString().toLowerCase() ?? '';
       return name.contains(query.toLowerCase()) ||
-          designation.contains(query.toLowerCase()) ||
+          department.contains(query.toLowerCase()) ||
           id.contains(query.toLowerCase()) ||
           email.contains(query.toLowerCase());
     }).toList();
@@ -111,20 +113,43 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
                           children: [
                             Text('ID: ${data['employeeId'] ?? 'N/A'}'),
                             Text('Email: ${data['email'] ?? 'N/A'}'),
-                            Text(data['designation'] ?? 'No Designation'),
+                            Text('Department: ${data['department'] ?? 'No department'}'),
                           ],
                         ),
-                        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => Employeedetailsview(
-                                employeeId: data['employeeId'], // 🔄 PASS ONLY ID
-                              ),
+                        trailing: PopupMenuButton<String>(
+                          icon: const Icon(Icons.more_vert),
+                          onSelected: (value) {
+                            if (value == 'view_details') {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => Employeedetailsview(
+                                    employeeId: data['employeeId'], // 🔄 PASS ONLY ID
+                                  ),
+                                ),
+                              );
+                            } else if (value == 'manage_permissions') {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => RolesPermissionsScreen(
+                                    role: data['role'] ?? 'HR', // 🔄 Pass current role
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(
+                              value: 'view_details',
+                              child: Text('View Details'),
                             ),
-                          );
-                        },
+                            const PopupMenuItem(
+                              value: 'manage_permissions',
+                              child: Text('Manage Role Permissions'),
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   },
