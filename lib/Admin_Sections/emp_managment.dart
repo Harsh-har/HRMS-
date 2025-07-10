@@ -1,7 +1,5 @@
-// Add this line at the top of your file
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
@@ -52,7 +50,18 @@ class _EmployeeFormState extends State<EmployeeForm> {
   @override
   void initState() {
     super.initState();
+    _generateEmployeeId();
     _selectedRole = _roles[_selectedDepartment]?.first ?? 'employee';
+  }
+
+  // 🔥 Auto-generate Employee ID
+  Future<void> _generateEmployeeId() async {
+    final snapshot = await FirebaseFirestore.instance.collection('employees').get();
+    int count = snapshot.size + 1; // Increment for new ID
+    String newId = 'EMP-${1000 + count}';
+    setState(() {
+      _employeeIdController.text = newId;
+    });
   }
 
   Future<void> _pickImage() async {
@@ -76,11 +85,6 @@ class _EmployeeFormState extends State<EmployeeForm> {
 
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
-
-    if (_employeeIdController.text.trim().isEmpty) {
-      _showError("Employee ID is required");
-      return;
-    }
 
     setState(() => _isLoading = true);
 
@@ -107,6 +111,7 @@ class _EmployeeFormState extends State<EmployeeForm> {
         'profileImage': profileImageUrl ?? '',
         'password': _passwordController.text.trim(),
         'dateOfBirth': Timestamp.fromDate(_dateOfBirth),
+        // 🆕 Emergency contact fields
         'emergencyContactName': _emergencyContactNameController.text.trim(),
         'emergencyContactRelation': _emergencyContactRelationController.text.trim(),
         'emergencyContactPhone': _emergencyContactPhoneController.text.trim(),
@@ -147,16 +152,6 @@ class _EmployeeFormState extends State<EmployeeForm> {
   void _resetForm() {
     _formKey.currentState?.reset();
     setState(() {
-      _employeeIdController.clear();
-      _nameController.clear();
-      _emailController.clear();
-      _phoneController.clear();
-      _addressController.clear();
-      _passwordController.clear();
-      _salaryController.clear();
-      _emergencyContactNameController.clear();
-      _emergencyContactRelationController.clear();
-      _emergencyContactPhoneController.clear();
       _profileImage = null;
       _joiningDate = DateTime.now();
       _dateOfBirth = DateTime(1990, 1, 1);
@@ -164,6 +159,10 @@ class _EmployeeFormState extends State<EmployeeForm> {
       _selectedDepartment = 'employee';
       _selectedRole = 'developer';
       _selectedEmploymentType = 'Full-time';
+      _emergencyContactNameController.clear();
+      _emergencyContactRelationController.clear();
+      _emergencyContactPhoneController.clear();
+      _generateEmployeeId(); // generate next ID
     });
   }
 
@@ -175,32 +174,6 @@ class _EmployeeFormState extends State<EmployeeForm> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: Colors.red));
   }
 
-  String? _validateEmail(String? value) {
-    if (value == null || value.isEmpty) return 'Enter Email';
-    final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
-    if (!emailRegex.hasMatch(value)) return 'Enter valid Email';
-    return null;
-  }
-  String? _validatePhone(String? value) {
-    if (value == null || value.isEmpty) return 'Enter Phone';
-    if (!RegExp(r'^[0-9]{10}$').hasMatch(value)) return 'Enter 10-digit number';
-    return null;
-  }
-
-
-
-  String? _validatePassword(String? value) {
-    if (value == null || value.isEmpty) return 'Enter Password';
-    if (value.length < 6) return 'Min 6 characters';
-    return null;
-  }
-
-  String? _validateSalary(String? value) {
-    if (value == null || value.isEmpty) return 'Enter Salary';
-    if (double.tryParse(value) == null) return 'Enter valid number';
-    return null;
-  }
-
   Widget _buildTextField(TextEditingController controller, String label, IconData icon,
       {bool isPassword = false, TextInputType keyboardType = TextInputType.text, String? Function(String?)? validator}) {
     return Padding(
@@ -209,6 +182,7 @@ class _EmployeeFormState extends State<EmployeeForm> {
         controller: controller,
         obscureText: isPassword,
         keyboardType: keyboardType,
+        readOnly: label == 'Employee ID', // make ID field read-only
         decoration: InputDecoration(
           labelText: label,
           prefixIcon: Icon(icon),
@@ -295,10 +269,10 @@ class _EmployeeFormState extends State<EmployeeForm> {
                 ),
               ),
               const SizedBox(height: 20),
-              _buildTextField(_employeeIdController, 'Employee ID', Icons.badge),
+              _buildTextField(_employeeIdController, 'Employee ID', Icons.badge), // 🔥 Auto-generated
               _buildTextField(_nameController, 'Full Name', Icons.person),
-              _buildTextField(_emailController, 'Email', Icons.email, keyboardType: TextInputType.emailAddress, validator: _validateEmail),
-              _buildTextField(_phoneController, 'Phone', Icons.phone, keyboardType: TextInputType.phone, validator: _validatePhone),
+              _buildTextField(_emailController, 'Email', Icons.email, keyboardType: TextInputType.emailAddress),
+              _buildTextField(_phoneController, 'Phone', Icons.phone, keyboardType: TextInputType.phone),
               _buildTextField(_addressController, 'Address', Icons.home),
 
               _buildDropdown(_selectedGender, 'Gender', Icons.person, ['male', 'female', 'other'], (val) => setState(() => _selectedGender = val)),
@@ -310,19 +284,21 @@ class _EmployeeFormState extends State<EmployeeForm> {
               _buildDatePicker('Joining Date', _joiningDate, (val) => setState(() => _joiningDate = val)),
               _buildDatePicker('Date of Birth', _dateOfBirth, (val) => setState(() => _dateOfBirth = val)),
 
-              _buildTextField(_salaryController, 'Salary', Icons.money, keyboardType: TextInputType.number, validator: _validateSalary),
-              _buildTextField(_passwordController, 'Password', Icons.lock, isPassword: true, validator: _validatePassword),
+              _buildTextField(_salaryController, 'Salary', Icons.money, keyboardType: TextInputType.number),
+              _buildTextField(_passwordController, 'Password', Icons.lock, isPassword: true),
 
               const SizedBox(height: 16),
               const Align(alignment: Alignment.centerLeft, child: Text("Emergency Contact Details", style: TextStyle(fontWeight: FontWeight.bold))),
               _buildTextField(_emergencyContactNameController, 'Contact Name', Icons.person),
               _buildTextField(_emergencyContactRelationController, 'Relation', Icons.group),
-              _buildTextField(_emergencyContactPhoneController, 'Contact Phone', Icons.phone, keyboardType: TextInputType.phone, validator: _validatePhone),
+              _buildTextField(_emergencyContactPhoneController, 'Contact Phone', Icons.phone, keyboardType: TextInputType.phone),
 
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: _isLoading ? null : _submitForm,
-                child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text("Submit"),
+                child: _isLoading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text("Submit"),
                 style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(50)),
               ),
             ],

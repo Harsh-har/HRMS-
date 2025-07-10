@@ -95,8 +95,8 @@ class _EmployeeDetailsViewState extends State<Employeedetailsview> {
         backgroundColor: const Color(0xFF002147),
         actions: [
           IconButton(
-            icon: const Icon(Icons.delete),
-            onPressed: () => _showDeactivateDialog(context),
+            icon: const Icon(Icons.power_settings_new),
+            onPressed: () => _showStatusToggleDialog(context),
           ),
         ],
       ),
@@ -113,7 +113,7 @@ class _EmployeeDetailsViewState extends State<Employeedetailsview> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                _buildProfileHeader(profileUrl, name, role, empId),
+                _buildProfileHeader(profileUrl, name, role, empId, status),
                 const SizedBox(height: 24),
                 _buildSection('Personal Details', [
                   _buildDetailItem(Icons.person, 'Full Name', name),
@@ -146,7 +146,7 @@ class _EmployeeDetailsViewState extends State<Employeedetailsview> {
     );
   }
 
-  Widget _buildProfileHeader(String profileUrl, String name, String role, String empId) {
+  Widget _buildProfileHeader(String profileUrl, String name, String role, String empId, String status) {
     return Column(
       children: [
         GestureDetector(
@@ -169,6 +169,15 @@ class _EmployeeDetailsViewState extends State<Employeedetailsview> {
         const SizedBox(height: 12),
         Text(name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
         Text(role, style: const TextStyle(fontSize: 16, color: Colors.white70)),
+        const SizedBox(height: 8),
+        Chip(
+          backgroundColor: status == 'inactive' ? Colors.red[100] : Colors.green[100],
+          label: Text('Status: ${status.toUpperCase()}',
+              style: TextStyle(
+                color: status == 'inactive' ? Colors.red[900] : Colors.green[900],
+                fontWeight: FontWeight.bold,
+              )),
+        ),
         const SizedBox(height: 8),
         Chip(
           backgroundColor: Colors.yellow[100],
@@ -255,37 +264,49 @@ class _EmployeeDetailsViewState extends State<Employeedetailsview> {
     }
   }
 
-  void _showDeactivateDialog(BuildContext context) {
+  void _showStatusToggleDialog(BuildContext context) {
+    final currentStatus = employeeData!['status']?.toString().toLowerCase() ?? 'active';
+    final isInactive = currentStatus == 'inactive';
+
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Deactivate Employee'),
-        content: const Text('Are you sure you want to deactivate this employee?'),
+        title: Text(isInactive ? 'Reactivate Employee' : 'Deactivate Employee'),
+        content: Text(isInactive
+            ? 'Do you want to reactivate this employee?'
+            : 'Are you sure you want to deactivate this employee?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isInactive ? Colors.green : Colors.orange,
+            ),
             onPressed: () async {
+              final newStatus = isInactive ? 'active' : 'inactive';
+
               await FirebaseFirestore.instance
                   .collection('employees')
                   .doc(widget.employeeId)
-                  .update({'status': 'inactive'});
+                  .update({'status': newStatus});
 
               if (!mounted) return;
               Navigator.of(context).pop();
 
               setState(() {
-                employeeData!['status'] = 'inactive';
+                employeeData!['status'] = newStatus;
               });
 
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Employee deactivated'), backgroundColor: Colors.orange),
+                SnackBar(
+                  content: Text('Employee ${isInactive ? 're-activated' : 'deactivated'}'),
+                  backgroundColor: isInactive ? Colors.green : Colors.orange,
+                ),
               );
             },
-            child: const Text('Deactivate'),
+            child: Text(isInactive ? 'Reactivate' : 'Deactivate'),
           ),
         ],
       ),

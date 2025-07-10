@@ -1,65 +1,119 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:hrms_project/Admin_Sections/admin_notification.dart';
-import '../Admin_Sections/Adminweeklywatchsheet.dart';
+
+// Import your actual HR Profile screen here
+import 'HrProfile.dart';
+
+
+// Admin modules reused for now
 import '../Admin_Sections/EmployeeListPage.dart';
 import '../Admin_Sections/admin _Attandencemonitor.dart';
-import '../Admin_Sections/admin_holidaycalender.dart';
 import '../Admin_Sections/admin_leaverequest.dart';
+import '../Admin_Sections/Adminweeklywatchsheet.dart';
+import '../Admin_Sections/admin_holidaycalender.dart';
 import '../Admin_Sections/admin_performance.dart';
-import '../Admin_Sections/admin_profile.dart';
 import '../Admin_Sections/admin_projectswatch.dart';
 import '../Admin_Sections/admin_setting.dart';
+import '../Admin_Sections/admin_notification.dart';
 
+class HrDashboard extends StatefulWidget {
+  final Map<String, dynamic> employeeData;
 
-void main() => runApp( HrDashboard());
+  const HrDashboard({super.key, required this.employeeData});
 
-class  HrDashboard extends StatelessWidget {
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      home: DashboardScreen(),
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        scaffoldBackgroundColor: Colors.grey[100],
-      ),
-    );
-  }
+  State<HrDashboard> createState() => _HrDashboardState();
 }
 
-class DashboardScreen extends StatelessWidget {
+class _HrDashboardState extends State<HrDashboard> {
+  Map<String, bool> hrPermissions = {};
+  bool isLoading = true;
+
   final Stream<int> _unreadNotificationCount = FirebaseFirestore.instance
       .collection('notifications')
       .where('status', isEqualTo: 'unread')
       .snapshots()
       .map((snapshot) => snapshot.docs.length);
 
-  final List<Map<String, dynamic>> gridItems = [
-    {"icon": Icons.group, "label": "Employee Management"},
-    {"icon": Icons.event_note, "label": "Attendance Monitoring"},
-    {"icon": Icons.insert_chart, "label": "Leave Management"},
-    {"icon": Icons.access_time, "label": "TimeSheets"},
-    {"icon": Icons.calendar_today, "label": "Holiday Calendar"},
-    {"icon": Icons.folder, "label": "Employee Review"},
+  final List<Map<String, dynamic>> modules = [
+    {
+      "icon": Icons.group,
+      "label": "Employee Management",
+      "key": "employee_details",
+      "screen": const EmployeeListPage(),
+    },
+    {
+      "icon": Icons.event_note,
+      "label": "Attendance Monitoring",
+      "key": "attendance",
+      "screen": AttendanceMonitoringScreen(),
+    },
+    {
+      "icon": Icons.insert_chart,
+      "label": "Leave Management",
+      "key": "leave_requests",
+      "screen": LeaveRequestsPage(),
+    },
+    {
+      "icon": Icons.access_time,
+      "label": "TimeSheets",
+      "key": "time_sheet",
+      "screen": TimesheetPagee(),
+    },
+    {
+      "icon": Icons.calendar_today,
+      "label": "Holiday Calendar",
+      "key": "holiday_calendar",
+      "screen": HolidayCalendarAdminScreen(),
+    },
+    {
+      "icon": Icons.folder,
+      "label": "Employee Review",
+      "key": "projects",
+      "screen": AddPerformanceReviewScreen(),
+    },
   ];
 
   @override
+  void initState() {
+    super.initState();
+    fetchPermissions();
+  }
+
+  Future<void> fetchPermissions() async {
+    final doc = await FirebaseFirestore.instance
+        .collection('roles_permissions')
+        .doc('hr')
+        .get();
+
+    if (doc.exists) {
+      setState(() {
+        hrPermissions = Map<String, bool>.from(doc.data()!);
+        isLoading = false;
+      });
+    } else {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    final adminName = user?.displayName ?? 'Pradeep Kumar';
-    final adminImage = user?.photoURL ?? 'assets/profile/adminimage.jpg';
+    final String hrName = widget.employeeData['name'] ?? 'HR';
+    final String hrImage = widget.employeeData['profileImage'] ?? '';
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
-      body: SafeArea(
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Profile Row
+              // 🔝 Profile Row
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -67,14 +121,16 @@ class DashboardScreen extends StatelessWidget {
                     children: [
                       CircleAvatar(
                         radius: 30,
-                        backgroundImage: adminImage.startsWith('assets')
-                            ? AssetImage(adminImage)
-                            : NetworkImage(adminImage) as ImageProvider,
+                        backgroundImage: hrImage.isNotEmpty
+                            ? NetworkImage(hrImage)
+                            : const AssetImage('assets/profile/adminimage.jpg')
+                        as ImageProvider,
                       ),
                       const SizedBox(width: 25),
                       Text(
-                        adminName,
-                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                        hrName,
+                        style: const TextStyle(
+                            fontSize: 22, fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
@@ -82,23 +138,17 @@ class DashboardScreen extends StatelessWidget {
                     stream: _unreadNotificationCount,
                     builder: (context, snapshot) {
                       int unreadCount = snapshot.data ?? 0;
-
                       return Stack(
                         children: [
                           IconButton(
                             icon: const Icon(Icons.notifications),
                             onPressed: () {
-                              try {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (context) => const AdminNotificationScreen()),
-                                );
-                              } catch (e) {
-                                print('Error navigating to AdminNotification: $e');
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Failed to open notifications: $e'), backgroundColor: Colors.red),
-                                );
-                              }
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) =>
+                                    const AdminNotificationScreen()),
+                              );
                             },
                           ),
                           if (unreadCount > 0)
@@ -111,10 +161,6 @@ class DashboardScreen extends StatelessWidget {
                                   color: Colors.red,
                                   shape: BoxShape.circle,
                                 ),
-                                constraints: const BoxConstraints(
-                                  minWidth: 8,
-                                  minHeight: 8,
-                                ),
                               ),
                             ),
                         ],
@@ -125,53 +171,23 @@ class DashboardScreen extends StatelessWidget {
               ),
               const SizedBox(height: 70),
 
-              // Grid
+              // 📦 Grid Modules
               Expanded(
                 child: GridView.count(
                   crossAxisCount: 2,
                   crossAxisSpacing: 16,
                   mainAxisSpacing: 16,
-                  children: gridItems.map((item) {
+                  children: modules
+                      .where((module) =>
+                  hrPermissions[module['key']] == true)
+                      .map((item) {
                     return GestureDetector(
                       onTap: () {
-                        try {
-                          if (item["label"] == "Employee Management") {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => EmployeeListPage()),
-                            );
-                          } else if (item["label"] == "Attendance Monitoring") {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => AttendanceMonitoringScreen()),
-                            );
-                          } else if (item["label"] == "Leave Management") {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => LeaveRequestsPage()),
-                            );
-                          } else if (item["label"] == "TimeSheets") {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => TimesheetPagee()),
-                            );
-                          } else if (item["label"] == "Holiday Calendar") {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => HolidayCalendarAdminScreen()),
-                            );
-                          } else if (item["label"] == "Employee Review") {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => AddPerformanceReviewScreen()),
-                            );
-                          }
-                        } catch (e) {
-                          print('Error navigating to ${item["label"]}: $e');
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Failed to open ${item["label"]}: $e'), backgroundColor: Colors.red),
-                          );
-                        }
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => item['screen']),
+                        );
                       },
                       child: Container(
                         decoration: BoxDecoration(
@@ -182,7 +198,7 @@ class DashboardScreen extends StatelessWidget {
                               color: Colors.grey.withOpacity(0.2),
                               spreadRadius: 2,
                               blurRadius: 5,
-                              offset: Offset(0, 3),
+                              offset: const Offset(0, 3),
                             ),
                           ],
                         ),
@@ -190,9 +206,11 @@ class DashboardScreen extends StatelessWidget {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(item["icon"], size: 50, color: Colors.blueAccent),
+                              Icon(item['icon'] as IconData,
+                                  size: 50, color: Colors.blueAccent),
                               const SizedBox(height: 10),
-                              Text(item["label"], style: TextStyle(fontSize: 16)),
+                              Text(item['label'] as String,
+                                  style: const TextStyle(fontSize: 16)),
                             ],
                           ),
                         ),
@@ -211,35 +229,29 @@ class DashboardScreen extends StatelessWidget {
         unselectedItemColor: Colors.grey,
         backgroundColor: Colors.black,
         onTap: (index) {
-          try {
-            if (index == 1) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => ProjectScreen()),
-              );
-            } else if (index == 2) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => AdminProfile()),
-              );
-            } else if (index == 3) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => AdminSetting()),
-              );
-            }
-          } catch (e) {
-            print('Error navigating to bottom nav index $index: $e');
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Failed to navigate: $e'), backgroundColor: Colors.red),
+          if (index == 1) {
+            Navigator.push(
+                context, MaterialPageRoute(builder: (_) => ProjectScreen()));
+          } else if (index == 2) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) =>
+                      HrProfile(employeeData: widget.employeeData)),
             );
+          } else if (index == 3) {
+            Navigator.push(
+                context, MaterialPageRoute(builder: (_) => AdminSetting()));
           }
         },
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
-          BottomNavigationBarItem(icon: Icon(Icons.insert_chart), label: 'Projects'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.dashboard), label: 'Dashboard'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.insert_chart), label: 'Projects'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Setting'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.settings), label: 'Setting'),
         ],
       ),
     );

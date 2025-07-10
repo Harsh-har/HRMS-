@@ -4,7 +4,6 @@ import '../Employee_Sections/EmployeeDashboard.dart';
 import '../Admin_Sections/admin_dashboard.dart';
 import '../Hr_Section/HrDashboard.dart';
 import '../Manager_Section/ManagerDashboar.dart';
-// ✅ Fix typo here
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -111,16 +110,17 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           nextScreen = AdminDashboard();
           break;
         case 'hr':
-          nextScreen = HrDashboard();
+          nextScreen = HrDashboard(employeeData: userData);
           break;
         case 'manager':
         case 'teammanager':
         case 'projectmanager':
-          nextScreen = ManagerDashboard(role: role); // ✅ Pass role
+          nextScreen = ManagerDashboard(employeeData: userData);
           break;
         default:
           nextScreen = EmployeeDashboard(employeeData: userData);
       }
+
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("$role login successful!"), backgroundColor: Colors.green),

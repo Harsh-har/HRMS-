@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:hrms_project/Hr_Section/HrProfile.dart';
+
 import '../Admin_Sections/admin_notification.dart';
 import '../Admin_Sections/admin_projectswatch.dart';
-import '../Admin_Sections/admin_profile.dart';
 import '../Admin_Sections/admin_setting.dart';
 import '../Admin_Sections/admin_leaverequest.dart';
 import '../Admin_Sections/EmployeeListPage.dart';
@@ -11,10 +12,10 @@ import '../Admin_Sections/admin_holidaycalender.dart';
 import '../Admin_Sections/Adminweeklywatchsheet.dart';
 import '../Admin_Sections/admin_performance.dart';
 
-class ManagerDashboard extends StatefulWidget {
-  final String role;
 
-  const ManagerDashboard({Key? key, required this.role}) : super(key: key);
+class ManagerDashboard extends StatefulWidget {
+  final Map<String, dynamic> employeeData;
+  const ManagerDashboard({Key? key, required this.employeeData}) : super(key: key);
 
   @override
   State<ManagerDashboard> createState() => _ManagerDashboardState();
@@ -37,9 +38,10 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
   }
 
   Future<void> fetchRolePermissions() async {
+    final role = widget.employeeData['role']?.toString().toLowerCase() ?? 'manager';
     final doc = await FirebaseFirestore.instance
         .collection('roles_permissions')
-        .doc(widget.role)
+        .doc(role)
         .get();
 
     if (doc.exists) {
@@ -57,8 +59,8 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    final String managerName = 'Team Manager'; // Replace with dynamic name if needed
-    final String profileImage = 'assets/profile/managerimage.jpg'; // Replace with manager image path
+    final String managerName = widget.employeeData['name'] ?? 'Manager';
+    final String profileImage = widget.employeeData['profileImage'] ?? '';
 
     final List<Map<String, dynamic>> gridItems = [
       if (permissions['employee_details'] == true)
@@ -66,11 +68,11 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
       if (permissions['attendance'] == true)
         {"icon": Icons.event_note, "label": "Attendance Monitoring", "screen": AttendanceMonitoringScreen()},
       if (permissions['leave_requests'] == true)
-        {"icon": Icons.insert_chart, "label": "Leave Management", "screen":  LeaveRequestsPage()},
+        {"icon": Icons.insert_chart, "label": "Leave Management", "screen": LeaveRequestsPage()},
       if (permissions['time_sheet'] == true)
         {"icon": Icons.access_time, "label": "TimeSheets", "screen": const TimesheetPagee()},
       if (permissions['holiday_calendar'] == true)
-        {"icon": Icons.calendar_today, "label": "Holiday Calendar", "screen":  HolidayCalendarAdminScreen()},
+        {"icon": Icons.calendar_today, "label": "Holiday Calendar", "screen": HolidayCalendarAdminScreen()},
       if (permissions['projects'] == true)
         {"icon": Icons.folder, "label": "Employee Review", "screen": const AddPerformanceReviewScreen()},
     ];
@@ -85,7 +87,6 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Profile Row
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -93,9 +94,10 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
                     children: [
                       CircleAvatar(
                         radius: 30,
-                        backgroundImage: profileImage.startsWith('assets')
-                            ? AssetImage(profileImage)
-                            : NetworkImage(profileImage) as ImageProvider,
+                        backgroundImage: profileImage.isNotEmpty
+                            ? NetworkImage(profileImage)
+                            : const AssetImage('assets/profile/managerimage.jpg')
+                        as ImageProvider,
                       ),
                       const SizedBox(width: 20),
                       Text(
@@ -138,8 +140,6 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
                 ],
               ),
               const SizedBox(height: 70),
-
-              // GridView
               Expanded(
                 child: GridView.count(
                   crossAxisCount: 2,
@@ -185,8 +185,6 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
           ),
         ),
       ),
-
-      // Optional bottom nav
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         selectedItemColor: Colors.white,
@@ -194,11 +192,16 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
         backgroundColor: Colors.black,
         onTap: (index) {
           if (index == 1) {
-            Navigator.push(context, MaterialPageRoute(builder: (_) =>  ProjectScreen()));
+            Navigator.push(context, MaterialPageRoute(builder: (_) => ProjectScreen()));
           } else if (index == 2) {
-            Navigator.push(context, MaterialPageRoute(builder: (_) =>  AdminProfile()));
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => HrProfile(employeeData: widget.employeeData),
+              ),
+            );
           } else if (index == 3) {
-            Navigator.push(context, MaterialPageRoute(builder: (_) =>  AdminSetting()));
+            Navigator.push(context, MaterialPageRoute(builder: (_) => AdminSetting()));
           }
         },
         items: const [
