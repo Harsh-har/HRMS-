@@ -4,8 +4,6 @@ import '../Employee_Sections/EmployeeDashboard.dart';
 import '../Admin_Sections/admin_dashboard.dart';
 import '../Hr_Section/HrDashboard.dart';
 
-
-
 class TeamManagerDashboard extends StatelessWidget {
   final Map<String, dynamic> employeeData;
   const TeamManagerDashboard({super.key, required this.employeeData});
@@ -65,7 +63,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       return;
     }
 
-    // Hardcoded SuperAdmin login
+    // SuperAdmin login
     if (email == 'pradeep@gmail.com' && password == '123456') {
       if (selectedDepartment != 'admin') {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -78,7 +76,10 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     }
 
     try {
-      final snapshot = await FirebaseFirestore.instance.collection('employees').where('email', isEqualTo: email).get();
+      final snapshot = await FirebaseFirestore.instance
+          .collection('employees')
+          .where('email', isEqualTo: email)
+          .get();
 
       if (snapshot.docs.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -91,6 +92,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       final storedPassword = userData['password'];
       final role = (userData['role'] ?? '').toString().toLowerCase();
       final department = (userData['department'] ?? '').toString().toLowerCase();
+      final status = userData['status']?.toString().toLowerCase() ?? 'active';
 
       if (storedPassword != password) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -102,6 +104,13 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       if (department != selectedDepartment?.toLowerCase()) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Department mismatch. Your department is $department."), backgroundColor: Colors.red),
+        );
+        return;
+      }
+
+      if (status == 'inactive') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Your account has been deactivated. Contact admin."), backgroundColor: Colors.red),
         );
         return;
       }

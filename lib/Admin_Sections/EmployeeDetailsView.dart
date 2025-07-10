@@ -1,47 +1,93 @@
 import 'dart:io';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:hrms_project/Admin_Sections/admin_login.dart';
 import 'package:intl/intl.dart';
 
 class Employeedetailsview extends StatefulWidget {
-  final Map<String, dynamic> employeeData;
+  final String employeeId;
 
-  const Employeedetailsview({super.key, required this.employeeData});
+  const Employeedetailsview({super.key, required this.employeeId});
 
   @override
-  State<Employeedetailsview> createState() => _ProfileScreenState();
+  State<Employeedetailsview> createState() => _EmployeeDetailsViewState();
 }
 
-class _ProfileScreenState extends State<Employeedetailsview> {
-  late Map<String, dynamic> employeeData;
+class _EmployeeDetailsViewState extends State<Employeedetailsview> {
+  Map<String, dynamic>? employeeData;
+  bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    employeeData = widget.employeeData;
+    _fetchEmployeeData();
+  }
+
+  Future<void> _fetchEmployeeData() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('employees')
+          .doc(widget.employeeId)
+          .get();
+
+      if (snapshot.exists) {
+        setState(() {
+          employeeData = snapshot.data();
+          isLoading = false;
+        });
+      } else {
+        setState(() {
+          isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Employee data not found')),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error fetching data: $e')),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final profileUrl = employeeData['profileUrl'] ?? "https://randomuser.me/api/portraits/men/1.jpg";
-    final name = employeeData['name'] ?? 'No Name Provided';
-    final designation = employeeData['designation'] ?? 'No Designation';
-    final empId = employeeData['employeeId'] ?? 'N/A';
-    final department = employeeData['department'] ?? 'N/A';
-    final email = employeeData['email'] ?? 'N/A';
-    final phone = employeeData['phone'] ?? 'N/A';
+    if (isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
-    final dob = _formatDate(employeeData['dob']);
-    final joinDate = _formatDate(employeeData['joinDate']);
+    if (employeeData == null) {
+      return const Scaffold(
+        body: Center(child: Text('No data found')),
+      );
+    }
 
-    final workHours = employeeData['workHours'] ?? 'N/A';
-    final emergencyContactName = employeeData['emergencyContactName'] ?? 'N/A';
-    final emergencyContactRelation = employeeData['emergencyContactRelation'] ?? 'N/A';
-    final emergencyContactPhone = employeeData['emergencyContactPhone'] ?? 'N/A';
+    final profileUrl = employeeData!['profileImage']?.toString().isNotEmpty == true
+        ? employeeData!['profileImage']
+        : "https://randomuser.me/api/portraits/men/1.jpg";
+
+    final name = employeeData!['name'] ?? 'No Name Provided';
+    final role = employeeData!['role'] ?? 'N/A';
+    final empId = employeeData!['employeeId'] ?? 'N/A';
+    final department = employeeData!['department'] ?? 'N/A';
+    final email = employeeData!['email'] ?? 'N/A';
+    final phone = employeeData!['phone'] ?? 'N/A';
+    final dob = _formatDate(employeeData!['dateOfBirth']);
+    final joinDate = _formatDate(employeeData!['joiningDate']);
+    final address = employeeData!['address'] ?? 'N/A';
+    final gender = employeeData!['gender'] ?? 'N/A';
+    final employmentType = employeeData!['employmentType'] ?? 'N/A';
+    final salary = employeeData!['salary']?.toString() ?? 'N/A';
+    final status = employeeData!['status'] ?? 'N/A';
+    final emergencyContactName = employeeData!['emergencyContactName'] ?? 'N/A';
+    final emergencyContactRelation = employeeData!['emergencyContactRelation'] ?? 'N/A';
+    final emergencyContactPhone = employeeData!['emergencyContactPhone'] ?? 'N/A';
 
     return Scaffold(
       appBar: AppBar(
@@ -67,25 +113,29 @@ class _ProfileScreenState extends State<Employeedetailsview> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                _buildProfileHeader(profileUrl, name, designation, empId),
+                _buildProfileHeader(profileUrl, name, role, empId),
                 const SizedBox(height: 24),
                 _buildSection('Personal Details', [
                   _buildDetailItem(Icons.person, 'Full Name', name),
                   _buildDetailItem(Icons.email, 'Email', email),
                   _buildDetailItem(Icons.phone, 'Phone', phone),
                   _buildDetailItem(Icons.cake, 'Date of Birth', dob),
+                  _buildDetailItem(Icons.male, 'Gender', gender),
+                  _buildDetailItem(Icons.location_on, 'Address', address),
                 ]),
                 const SizedBox(height: 16),
                 _buildSection('Company Details', [
                   _buildDetailItem(Icons.business, 'Department', department),
-                  _buildDetailItem(Icons.work, 'Designation', designation),
+                  _buildDetailItem(Icons.badge, 'Role', role),
                   _buildDetailItem(Icons.event, 'Join Date', joinDate),
-                  _buildDetailItem(Icons.access_time, 'Work Hours', workHours),
+                  _buildDetailItem(Icons.work_history, 'Employment Type', employmentType),
+                  _buildDetailItem(Icons.attach_money, 'Salary', '₹ $salary'),
+                  _buildDetailItem(Icons.verified, 'Status', status),
                 ]),
                 const SizedBox(height: 16),
                 _buildSection('Emergency Contact', [
                   _buildDetailItem(Icons.contact_emergency, 'Name', emergencyContactName),
-                  _buildDetailItem(Icons.person, 'Relation', emergencyContactRelation),
+                  _buildDetailItem(Icons.group, 'Relation', emergencyContactRelation),
                   _buildDetailItem(Icons.phone, 'Phone', emergencyContactPhone),
                 ]),
               ],
@@ -96,7 +146,7 @@ class _ProfileScreenState extends State<Employeedetailsview> {
     );
   }
 
-  Widget _buildProfileHeader(String profileUrl, String name, String designation, String empId) {
+  Widget _buildProfileHeader(String profileUrl, String name, String role, String empId) {
     return Column(
       children: [
         GestureDetector(
@@ -108,25 +158,22 @@ class _ProfileScreenState extends State<Employeedetailsview> {
                 radius: 50,
                 backgroundImage: NetworkImage(profileUrl),
               ),
+              const CircleAvatar(
+                radius: 16,
+                backgroundColor: Colors.white,
+                child: Icon(Icons.edit, size: 18, color: Colors.blue),
+              ),
             ],
           ),
         ),
         const SizedBox(height: 12),
-        Text(
-          name,
-          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
-        ),
-        Text(
-          designation,
-          style: const TextStyle(fontSize: 16, color: Colors.white70),
-        ),
+        Text(name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
+        Text(role, style: const TextStyle(fontSize: 16, color: Colors.white70)),
         const SizedBox(height: 8),
         Chip(
           backgroundColor: Colors.yellow[100],
-          label: Text(
-            'ID: $empId',
-            style: TextStyle(color: Colors.blue[900], fontWeight: FontWeight.w600),
-          ),
+          label: Text('ID: $empId',
+              style: TextStyle(color: Colors.blue[900], fontWeight: FontWeight.w600)),
         ),
       ],
     );
@@ -185,16 +232,21 @@ class _ProfileScreenState extends State<Employeedetailsview> {
 
     if (picked != null) {
       final file = File(picked.path);
-      final employeeId = employeeData['employeeId'] ?? '';
-      final ref = FirebaseStorage.instance.ref().child('profile_images').child('$employeeId.jpg');
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('profile_images')
+          .child('${widget.employeeId}.jpg');
 
       await ref.putFile(file);
       final downloadUrl = await ref.getDownloadURL();
 
-      await FirebaseFirestore.instance.collection('employees').doc(employeeId).update({'profileUrl': downloadUrl});
+      await FirebaseFirestore.instance
+          .collection('employees')
+          .doc(widget.employeeId)
+          .update({'profileImage': downloadUrl});
 
       setState(() {
-        employeeData['profileUrl'] = downloadUrl;
+        employeeData!['profileImage'] = downloadUrl;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -217,19 +269,21 @@ class _ProfileScreenState extends State<Employeedetailsview> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
             onPressed: () async {
-              final employeeId = employeeData['employeeId'];
               await FirebaseFirestore.instance
                   .collection('employees')
-                  .doc(employeeId)
+                  .doc(widget.employeeId)
                   .update({'status': 'inactive'});
+
               if (!mounted) return;
               Navigator.of(context).pop();
+
+              setState(() {
+                employeeData!['status'] = 'inactive';
+              });
+
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Employee deactivated'), backgroundColor: Colors.orange),
               );
-              setState(() {
-                employeeData['status'] = 'inactive';
-              });
             },
             child: const Text('Deactivate'),
           ),

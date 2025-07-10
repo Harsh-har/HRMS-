@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hrms_project/Admin_Sections/EmployeeDetailsView.dart';
-
-import '../Employee_Sections/ProfileScreen.dart';
-import 'emp_managment.dart';
+import 'emp_managment.dart'; // Assuming this is where EmployeeForm is
 
 class EmployeeListPage extends StatefulWidget {
   const EmployeeListPage({Key? key}) : super(key: key);
@@ -13,7 +11,7 @@ class EmployeeListPage extends StatefulWidget {
 }
 
 class _EmployeeListPageState extends State<EmployeeListPage> {
-  TextEditingController _searchController = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
   String _searchQuery = "";
 
   Stream<QuerySnapshot> getEmployeesStream() {
@@ -26,8 +24,7 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
     super.dispose();
   }
 
-  List<QueryDocumentSnapshot> _filterEmployees(
-      List<QueryDocumentSnapshot> employees, String query) {
+  List<QueryDocumentSnapshot> _filterEmployees(List<QueryDocumentSnapshot> employees, String query) {
     if (query.isEmpty) return employees;
 
     return employees.where((employee) {
@@ -47,17 +44,12 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Employee List"),
+        title: const Text("Employee List"),
         backgroundColor: Colors.blue,
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => EmployeeForm(),
-            ),
-          );
+          Navigator.push(context, MaterialPageRoute(builder: (_) => EmployeeForm()));
         },
         backgroundColor: Colors.blue,
         child: const Icon(Icons.add),
@@ -76,7 +68,7 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
               },
               decoration: InputDecoration(
                 hintText: "Search by name, ID, email or designation",
-                prefixIcon: Icon(Icons.search),
+                prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -88,29 +80,30 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
               stream: getEmployeesStream(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
-                  return Center(child: CircularProgressIndicator());
+                  return const Center(child: CircularProgressIndicator());
                 }
 
-                final filteredEmployees =
-                _filterEmployees(snapshot.data!.docs, _searchQuery);
+                final filteredEmployees = _filterEmployees(snapshot.data!.docs, _searchQuery);
 
                 if (filteredEmployees.isEmpty) {
-                  return Center(child: Text("No matching employees found."));
+                  return const Center(child: Text("No matching employees found."));
                 }
 
                 return ListView.builder(
                   itemCount: filteredEmployees.length,
                   itemBuilder: (context, index) {
-                    final data =
-                    filteredEmployees[index].data() as Map<String, dynamic>;
+                    final doc = filteredEmployees[index];
+                    final data = doc.data() as Map<String, dynamic>;
 
                     return Card(
-                      margin:
-                      EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       child: ListTile(
                         leading: CircleAvatar(
-                          backgroundImage:
-                          NetworkImage(data['profileImage'] ?? ''),
+                          backgroundImage: NetworkImage(
+                            data['profileImage']?.toString().isNotEmpty == true
+                                ? data['profileImage']
+                                : 'https://randomuser.me/api/portraits/men/1.jpg',
+                          ),
                         ),
                         title: Text(data['name'] ?? 'No Name'),
                         subtitle: Column(
@@ -121,20 +114,13 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
                             Text(data['designation'] ?? 'No Designation'),
                           ],
                         ),
-                        trailing: Icon(Icons.arrow_forward_ios, size: 16),
+                        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                         onTap: () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) =>Employeedetailsview(
-                                employeeData: {
-                                  'name': data['name'],
-                                  'employeeId': data['employeeId'],
-                                  'email': data['email'],
-                                  'profileImage': data['profileImage'],
-                                  'designation': data['designation'],
-                                },
-
+                              builder: (_) => Employeedetailsview(
+                                employeeId: data['employeeId'], // 🔄 PASS ONLY ID
                               ),
                             ),
                           );

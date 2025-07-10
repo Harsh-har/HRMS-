@@ -27,19 +27,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final profileUrl = employeeData['profileUrl'] ??
-        "https://randomuser.me/api/portraits/men/1.jpg";
+    final profileUrl = employeeData['profileImage']?.isNotEmpty == true
+        ? employeeData['profileImage']
+        : "https://randomuser.me/api/portraits/men/1.jpg";
     final name = employeeData['name'] ?? 'No Name Provided';
-    final designation = employeeData['designation'] ?? 'No Designation';
+    final designation = employeeData['role'] ?? 'No Role';
     final empId = employeeData['employeeId'] ?? 'N/A';
     final department = employeeData['department'] ?? 'N/A';
     final email = employeeData['email'] ?? 'N/A';
     final phone = employeeData['phone'] ?? 'N/A';
+    final dob = _formatDate(employeeData['dateOfBirth']);
+    final joinDate = _formatDate(employeeData['joiningDate']);
 
-    final dob = _formatDate(employeeData['dob']);
-    final joinDate = _formatDate(employeeData['joinDate']);
+    final gender = employeeData['gender'] ?? 'N/A';
+    final address = employeeData['address'] ?? 'N/A';
+    final employmentType = employeeData['employmentType'] ?? 'N/A';
+    final salary = employeeData['salary']?.toString() ?? 'N/A';
+    final status = employeeData['status'] ?? 'N/A';
 
-    final workHours = employeeData['workHours'] ?? 'N/A';
     final emergencyContactName = employeeData['emergencyContactName'] ?? 'N/A';
     final emergencyContactRelation =
         employeeData['emergencyContactRelation'] ?? 'N/A';
@@ -77,20 +82,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _buildDetailItem(Icons.email, 'Email', email),
                   _buildDetailItem(Icons.phone, 'Phone', phone),
                   _buildDetailItem(Icons.cake, 'Date of Birth', dob),
+                  _buildDetailItem(Icons.person_outline, 'Gender', gender),
+                  _buildDetailItem(Icons.location_on, 'Address', address),
                 ]),
                 const SizedBox(height: 16),
                 _buildSection('Company Details', [
                   _buildDetailItem(Icons.business, 'Department', department),
-                  _buildDetailItem(Icons.work, 'Designation', designation),
+                  _buildDetailItem(Icons.work, 'Role', designation),
                   _buildDetailItem(Icons.event, 'Join Date', joinDate),
-                  _buildDetailItem(Icons.access_time, 'Work Hours', workHours),
+                  _buildDetailItem(Icons.access_time, 'Employment Type', employmentType),
+                  _buildDetailItem(Icons.monetization_on, 'Salary', '₹ $salary'),
+                  _buildDetailItem(Icons.verified_user, 'Status', status),
                 ]),
                 const SizedBox(height: 16),
                 _buildSection('Emergency Contact', [
-                  _buildDetailItem(
-                      Icons.contact_emergency, 'Name', emergencyContactName),
-                  _buildDetailItem(Icons.person, 'Relation',
-                      emergencyContactRelation),
+                  _buildDetailItem(Icons.contact_emergency, 'Name', emergencyContactName),
+                  _buildDetailItem(Icons.person, 'Relation', emergencyContactRelation),
                   _buildDetailItem(Icons.phone, 'Phone', emergencyContactPhone),
                 ]),
               ],
@@ -219,10 +226,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await FirebaseFirestore.instance
           .collection('employees')
           .doc(employeeId)
-          .update({'profileUrl': downloadUrl});
+          .update({'profileImage': downloadUrl});
 
       setState(() {
-        employeeData['profileUrl'] = downloadUrl;
+        employeeData['profileImage'] = downloadUrl;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
