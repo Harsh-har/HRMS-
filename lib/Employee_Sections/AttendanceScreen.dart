@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:slide_to_act/slide_to_act.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 
 class NewAttendanceScreen extends StatefulWidget {
   final Map<String, dynamic> employeeData;
@@ -22,6 +24,8 @@ class _NewAttendanceScreenState extends State<NewAttendanceScreen>
   DateTime? checkOutTime;
   List<Map<String, dynamic>> lastFiveRecords = [];
   double totalWorkedHours = 0.0;
+  Position? _currentPosition;
+  String _currentAddress = "Fetching location...";
 
   final GlobalKey<SlideActionState> _slideKey = GlobalKey();
   late AnimationController _animationController;
@@ -35,6 +39,7 @@ class _NewAttendanceScreenState extends State<NewAttendanceScreen>
     _fetchTodayAttendance();
     _fetchLastFiveRecords();
     _fetchTotalWorkedHours();
+    _getCurrentLocation();
 
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 500),
@@ -52,6 +57,60 @@ class _NewAttendanceScreenState extends State<NewAttendanceScreen>
       _timeString = DateFormat('hh:mm:ss a').format(now);
       _dateString = DateFormat('dd MMM yyyy').format(now);
     });
+  }
+
+  Future<void> _getCurrentLocation() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      setState(() {
+        _currentAddress = "Location services are disabled";
+      });
+      return;
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        setState(() {
+          _currentAddress = "Location permissions are denied";
+        });
+        return;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      setState(() {
+        _currentAddress = "Location permissions are permanently denied";
+      });
+      return;
+    }
+
+    try {
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      setState(() {
+        _currentPosition = position;
+      });
+
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      Placemark place = placemarks[0];
+      setState(() {
+        _currentAddress = "${place.street}, ${place.locality}, ${place.postalCode}, ${place.country}";
+      });
+    } catch (e) {
+      setState(() {
+        _currentAddress = "Could not fetch location: ${e.toString()}";
+      });
+    }
   }
 
   Future<void> _fetchTodayAttendance() async {
@@ -101,6 +160,8 @@ class _NewAttendanceScreenState extends State<NewAttendanceScreen>
             'date': data['date'] ?? '--',
             'checkIn': data['checkIn'] ?? '--',
             'checkOut': data['checkOut'] ?? '--',
+            'checkInLocation': data['checkInLocation'] ?? null,
+            'checkOutLocation': data['checkOutLocation'] ?? null,
           });
         }
       }
@@ -158,6 +219,20 @@ class _NewAttendanceScreenState extends State<NewAttendanceScreen>
   }
 
   Future<void> _handleSlideComplete() async {
+    if (_currentPosition == null) {
+      await _getCurrentLocation();
+      if (_currentPosition == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not get your location. Please try again.'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 2),
+            ));
+            _slideKey.currentState?.reset();
+        return;
+      }
+    }
+
     final now = DateTime.now();
     final dayName = DateFormat('EEEE').format(now);
     final dateFormatted = DateFormat('dd MMM yyyy').format(now);
@@ -172,13 +247,12 @@ class _NewAttendanceScreenState extends State<NewAttendanceScreen>
       final data = snapshot.data()!;
       if (data.containsKey('checkIn') && data.containsKey('checkOut')) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Already checked in and out today!'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 2),
-          ),
-        );
-        _slideKey.currentState?.reset();
+            const SnackBar(
+              content: Text('Already checked in and out today!'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 2),
+            ));
+            _slideKey.currentState?.reset();
         return;
       }
     }
@@ -189,6 +263,11 @@ class _NewAttendanceScreenState extends State<NewAttendanceScreen>
         'checkIn': DateFormat('hh:mm a').format(now),
         'date': dateFormatted,
         'timestamp': FieldValue.serverTimestamp(),
+        'checkInLocation': {
+          'latitude': _currentPosition!.latitude,
+          'longitude': _currentPosition!.longitude,
+          'address': _currentAddress,
+        },
       });
 
       setState(() {
@@ -211,6 +290,11 @@ class _NewAttendanceScreenState extends State<NewAttendanceScreen>
         await docRef.update({
           'checkOut': DateFormat('hh:mm a').format(now),
           'totalWorkedHours': '$hr hr ${min.toString().padLeft(2, '0')} min',
+          'checkOutLocation': {
+            'latitude': _currentPosition!.latitude,
+            'longitude': _currentPosition!.longitude,
+            'address': _currentAddress,
+          },
         });
 
         setState(() {
@@ -320,6 +404,16 @@ class _NewAttendanceScreenState extends State<NewAttendanceScreen>
                 _buildInfoColumn("Check Out", checkOutTime != null ? DateFormat('hh:mm a').format(checkOutTime!) : '--'),
               ],
             ),
+            const SizedBox(height: 16),
+            Text(
+              "Current Location:",
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo[600]),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _currentAddress,
+              style: const TextStyle(fontSize: 14),
+            ),
           ],
         ),
       ),
@@ -358,7 +452,11 @@ class _NewAttendanceScreenState extends State<NewAttendanceScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text("Check In: ${record['checkIn']}"),
-                      Text("Check Out: ${record['checkOut']}")
+                      if (record['checkInLocation'] != null)
+                        Text("Location: ${record['checkInLocation']['address'] ?? 'N/A'}"),
+                      Text("Check Out: ${record['checkOut']}"),
+                      if (record['checkOutLocation'] != null)
+                        Text("Location: ${record['checkOutLocation']['address'] ?? 'N/A'}"),
                     ],
                   ),
                 );

@@ -27,62 +27,76 @@ class _employeewrokingscreenState extends State<employeewrokingscreen> {
   }
 
   Future<void> _fetchTimesheet() async {
-    final name = widget.employeeData['name'];
     final now = DateTime.now();
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
     final startOfMonth = DateTime(now.year, now.month, 1);
     final endOfMonth = DateTime(now.year, now.month + 1, 0);
+
     final days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     List<Map<String, String>> records = [];
 
-    final futures = days.map((day) {
-      return FirebaseFirestore.instance
-          .collection('attendance')
-          .doc(name)
-          .collection(day)
-          .get();
-    }).toList();
+    List<String> employeeNames = [];
 
-    final results = await Future.wait(futures);
+    if (widget.isAdminView) {
+      // Fetch all employee names from attendance collection
+      final snapshot = await FirebaseFirestore.instance.collection('attendance').get();
+      employeeNames = snapshot.docs.map((doc) => doc.id).toList();
+    } else {
+      // Only current employee
+      employeeNames = [widget.employeeData['name']];
+    }
 
-    for (var snapshots in results) {
-      for (var doc in snapshots.docs) {
-        final data = doc.data();
-        final dateStr = data['date'];
-        if (dateStr == null) continue;
+    for (var name in employeeNames) {
+      final futures = days.map((day) {
+        return FirebaseFirestore.instance
+            .collection('attendance')
+            .doc(name)
+            .collection(day)
+            .get();
+      }).toList();
 
-        try {
-          final recordDate = DateFormat('dd MMM yyyy').parse(dateStr);
-          bool includeRecord = false;
+      final results = await Future.wait(futures);
 
-          if (selectedFilter == 'This Week') {
-            includeRecord = recordDate.isAfter(startOfWeek.subtract(Duration(days: 1))) &&
-                recordDate.isBefore(startOfWeek.add(Duration(days: 7)));
-          } else if (selectedFilter == 'This Month') {
-            includeRecord = recordDate.isAfter(startOfMonth.subtract(Duration(days: 1))) &&
-                recordDate.isBefore(endOfMonth.add(Duration(days: 1)));
-          }
+      for (var snapshots in results) {
+        for (var doc in snapshots.docs) {
+          final data = doc.data();
+          final dateStr = data['date'];
+          if (dateStr == null) continue;
 
-          if (includeRecord) {
-            String status = 'Absent';
-            if (data['checkIn'] != null && data['checkOut'] != null) {
-              final checkInTime = DateFormat('hh:mm a').parse(data['checkIn']);
-              status = checkInTime.hour < 9 || (checkInTime.hour == 9 && checkInTime.minute > 0)
-                  ? 'Present'
-                  : 'Late';
+          try {
+            final recordDate = DateFormat('dd MMM yyyy').parse(dateStr);
+            bool includeRecord = false;
+
+            if (selectedFilter == 'This Week') {
+              includeRecord = recordDate.isAfter(startOfWeek.subtract(Duration(days: 1))) &&
+                  recordDate.isBefore(startOfWeek.add(Duration(days: 7)));
+            } else if (selectedFilter == 'This Month') {
+              includeRecord = recordDate.isAfter(startOfMonth.subtract(Duration(days: 1))) &&
+                  recordDate.isBefore(endOfMonth.add(Duration(days: 1)));
             }
 
-            records.add({
-              'date': data['date'] ?? '--',
-              'checkIn': data['checkIn'] ?? '-',
-              'checkOut': data['checkOut'] ?? '-',
-              'status': status,
-              'totalWorkedHours': data['totalWorkedHours'] ??
-                  calculateWorkedHours(data['checkIn'] ?? '-', data['checkOut'] ?? '-')
-            });
+            if (includeRecord) {
+              String status = 'Absent';
+              if (data['checkIn'] != null && data['checkOut'] != null) {
+                final checkInTime = DateFormat('hh:mm a').parse(data['checkIn']);
+                status = checkInTime.hour < 9 || (checkInTime.hour == 9 && checkInTime.minute > 0)
+                    ? 'Present'
+                    : 'Late';
+              }
+
+              records.add({
+                'employeeName': name,
+                'date': data['date'] ?? '--',
+                'checkIn': data['checkIn'] ?? '-',
+                'checkOut': data['checkOut'] ?? '-',
+                'status': status,
+                'totalWorkedHours': data['totalWorkedHours'] ??
+                    calculateWorkedHours(data['checkIn'] ?? '-', data['checkOut'] ?? '-')
+              });
+            }
+          } catch (e) {
+            continue;
           }
-        } catch (e) {
-          continue;
         }
       }
     }
@@ -121,7 +135,7 @@ class _employeewrokingscreenState extends State<employeewrokingscreen> {
 
   @override
   Widget build(BuildContext context) {
-    final employeeName = widget.employeeData['name'];
+    final employeeName = widget.isAdminView ? 'All Employees' : widget.employeeData['name'];
 
     return Scaffold(
       appBar: AppBar(
@@ -156,6 +170,8 @@ class _employeewrokingscreenState extends State<employeewrokingscreen> {
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (widget.isAdminView)
+                    Text("Employee: ${day['employeeName']}"),
                   Text("Check-In: ${day['checkIn']} | Check-Out: ${day['checkOut']}"),
                   Text("Worked: ${day['totalWorkedHours']}"),
                 ],

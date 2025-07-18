@@ -46,7 +46,7 @@ class _HrDashboardState extends State<HrDashboard> {
       "icon": Icons.event_note,
       "label": "Attendance Monitoring",
       "key": "attendance",
-      "screen": AttendanceMonitoringScreen(),
+      "screen": AdminAttendanceScreen(),
     },
     {
       "icon": Icons.insert_chart,

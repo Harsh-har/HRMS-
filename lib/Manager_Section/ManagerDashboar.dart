@@ -66,7 +66,7 @@ class _ManagerDashboardState extends State<ManagerDashboard> {
       if (permissions['employee_details'] == true)
         {"icon": Icons.group, "label": "Employee Management", "screen": const EmployeeListPage()},
       if (permissions['attendance'] == true)
-        {"icon": Icons.event_note, "label": "Attendance Monitoring", "screen": AttendanceMonitoringScreen()},
+        {"icon": Icons.event_note, "label": "Attendance Monitoring", "screen": AdminAttendanceScreen()},
       if (permissions['leave_requests'] == true)
         {"icon": Icons.insert_chart, "label": "Leave Management", "screen": LeaveRequestsPage()},
       if (permissions['time_sheet'] == true)

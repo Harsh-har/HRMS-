@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:hrms_project/CustomForgotPasswordPage.dart';
 import '../Employee_Sections/EmployeeDashboard.dart';
 import '../Admin_Sections/admin_dashboard.dart';
 import '../Hr_Section/HrDashboard.dart';
@@ -221,7 +222,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                 alignment: Alignment.centerRight,
                 child: TextButton(
                   onPressed: () {
-                    // TODO: Forgot password logic
+                  Navigator.push(context, MaterialPageRoute(builder:(context) => CustomForgotPasswordPage(),));
                   },
                   child: const Text('Forgot Password?', style: TextStyle(color: Colors.blue)),
                 ),
