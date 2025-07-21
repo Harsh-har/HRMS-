@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 // Import your actual HR Profile screen here
+import '../Admin_Sections/AdminAttendanceScreen.dart';
 import 'HrProfile.dart';
 
 
 // Admin modules reused for now
 import '../Admin_Sections/EmployeeListPage.dart';
-import '../Admin_Sections/admin _Attandencemonitor.dart';
 import '../Admin_Sections/admin_leaverequest.dart';
 import '../Admin_Sections/Adminweeklywatchsheet.dart';
 import '../Admin_Sections/admin_holidaycalender.dart';

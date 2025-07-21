@@ -255,7 +255,7 @@ class _EmployeeDashboardState extends State<EmployeeDashboard> {
                   _buildShortcut("Submit Leave", Icons.send, SubmitLeaveRequestPage(employeeData: widget.employeeData)),
                   _buildShortcut("Profile", Icons.person, ProfileScreen(employeeData: widget.employeeData)),
                   _buildShortcut("Rewards", Icons.assessment, UserPerformanceScreen(employeeName: name)),
-                  _buildShortcut("Timesheet", Icons.schedule, UserTimesheetScreen(employeeData: widget.employeeData)),
+                  _buildShortcut("Timesheet", Icons.schedule, UserTimesheetScreen(employeeName: '',)),
                   _buildShortcut("Projects", Icons.folder, UserProjectScreen(employeeData: widget.employeeData)),
                 ],
               ),

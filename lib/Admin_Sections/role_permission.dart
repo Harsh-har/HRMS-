@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class RolesPermissionsScreen extends StatefulWidget {
-  final String role; // 🆕 Pass Role from previous screen
+  final String role;
 
   const RolesPermissionsScreen({Key? key, required this.role}) : super(key: key);
 

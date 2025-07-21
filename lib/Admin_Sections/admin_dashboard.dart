@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hrms_project/Admin_Sections/admin_notification.dart';
+import 'AdminAttendanceScreen.dart';
 import 'Adminweeklywatchsheet.dart';
 import 'EmployeeListPage.dart';
-import 'Employeeworking_Hours.dart';
 import 'admin_holidaycalender.dart';
 import 'admin_performance.dart';
 import 'admin_profile.dart';
@@ -143,7 +143,9 @@ class DashboardScreen extends StatelessWidget {
                           } else if (item["label"] == "Attendance Monitoring") {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (context) => employeewrokingscreen(employeeData: {},)),
+                              MaterialPageRoute(
+                                builder: (context) => AdminAttendanceScreen()
+                              ),
                             );
                           } else if (item["label"] == "Leave Management") {
                             Navigator.push(
